@@ -1,0 +1,236 @@
+:root,
+:root[data-theme="dark"] {
+  --bg: #15161c;
+  --panel: #1b1d25;
+  --panel-2: #22252f;
+  --hover: #2a2d39;
+  --selected: #2f2a4d;
+  --border: #2d303c;
+  --text: #e7e9f0;
+  --muted: #8a8fa3;
+  --faint: #5d6274;
+  --accent: #7c5cff;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(124, 92, 255, 0.16);
+  --ok: #2fbf71;
+  --warn: #f0b429;
+  --danger: #ef5b67;
+  --add-bg: rgba(47, 191, 113, 0.13);
+  --add-fg: #6fdc9c;
+  --del-bg: rgba(239, 91, 103, 0.13);
+  --del-fg: #ff8e97;
+  --shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --lane-0: #7c5cff;
+  --lane-1: #22c3a6;
+  --lane-2: #f0883e;
+  --lane-3: #e5487f;
+  --lane-4: #3fa9f5;
+  --lane-5: #b5c934;
+  --lane-6: #c06cff;
+  --lane-7: #f5c542;
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --bg: #f6f7fa;
+  --panel: #ffffff;
+  --panel-2: #f0f1f5;
+  --hover: #e9ebf1;
+  --selected: #e6e0ff;
+  --border: #dfe1e8;
+  --text: #1d2030;
+  --muted: #646a80;
+  --faint: #9a9fb1;
+  --accent: #6544f0;
+  --accent-text: #ffffff;
+  --accent-soft: rgba(101, 68, 240, 0.12);
+  --ok: #1e9a57;
+  --warn: #b7800a;
+  --danger: #d63445;
+  --add-bg: rgba(30, 154, 87, 0.12);
+  --add-fg: #17713f;
+  --del-bg: rgba(214, 52, 69, 0.1);
+  --del-fg: #b0243a;
+  --shadow: 0 10px 40px rgba(20, 22, 40, 0.18);
+  --lane-0: #6544f0;
+  --lane-1: #109b82;
+  --lane-2: #d9691f;
+  --lane-3: #d12f6a;
+  --lane-4: #1f8ad8;
+  --lane-5: #7f9512;
+  --lane-6: #9a3ee0;
+  --lane-7: #c99a0e;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 Inter, "Segoe UI", system-ui, -apple-system, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+.mono,
+code {
+  font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 9px;
+  outline: none;
+  user-select: text;
+  width: 100%;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  background: var(--accent);
+}
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.btn.ghost:hover:not(:disabled) {
+  background: var(--hover);
+}
+.btn.small {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+.btn.icon {
+  padding: 5px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selectable {
+  user-select: text;
+  cursor: text;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.ref-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 180px;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.empty {
+  color: var(--faint);
+  padding: 12px;
+  text-align: center;
+}
