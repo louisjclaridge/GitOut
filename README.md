@@ -74,7 +74,7 @@ If no system keychain is available (for example a bare window manager without gn
 ## Releasing and auto-update
 
 1. Generate a signing key once: `npx tauri signer generate -w ~/.tauri/gitout.key`. Put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
-2. Add these repository secrets: `TAURI_SIGNING_PRIVATE_KEY` (the contents of the private key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` (leave it empty if the key has no password).
+2. Add the repository secret `TAURI_SIGNING_PRIVATE_KEY` with the contents of the private key file. If your key has a password, also add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` and pass it to the tauri-action step in `release.yml`.
 3. Set `plugins.updater.endpoints` to `https://github.com/<owner>/GitOut/releases/latest/download/latest.json`.
 4. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, then push a tag:
 
