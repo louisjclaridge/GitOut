@@ -1,4 +1,4 @@
-# Push a tag like v0.2.0 to build signed installers for every platform and
+# Push a tag like v0.2.0 to build signed Linux and Windows installers and
 # publish a GitHub Release. tauri-action also uploads latest.json, which the
 # in-app updater reads.
 name: Release
@@ -21,10 +21,6 @@ jobs:
             args: ""
           - platform: windows-latest
             args: ""
-          - platform: macos-latest
-            args: "--target aarch64-apple-darwin"
-          - platform: macos-latest
-            args: "--target x86_64-apple-darwin"
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -33,8 +29,6 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri

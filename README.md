@@ -1,12 +1,25 @@
 # GitOut
 
-A small, fast, cross-platform desktop git client: Linux, Windows and macOS.
+A small, fast, cross-platform desktop git client for Linux and Windows.
+
+![GitOut showing a repository's commit graph, branches and staging panel](docs/screenshots/main.webp)
 
 - **Lightweight**: built with [Tauri 2](https://tauri.app) on the system webview, so installers are around 10 MB instead of 150+ MB for Electron apps. The UI is Svelte 5 with no component framework (about 45 KB gzipped).
 - **Your git, not a reimplementation**: it runs the `git` you already have. SSH keys, credential helpers, hooks, `.gitconfig`, LFS and signing all behave exactly as they do in your terminal.
 - **Easy**: commit graph, one-click stage/unstage, hunk staging, commit and amend, branches, merge and rebase, cherry-pick, revert, reset, tags, stashes, and push/pull/fetch with ahead/behind counts. Right-click anything for more.
 - **Sign in** to GitHub, GitLab (including self-hosted) and Bitbucket. Browse and clone your repositories, and push over HTTPS without passwords. Tokens live in the OS keychain.
 - **Auto-updates** from signed GitHub Releases.
+
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Diff of an unstaged file with per-hunk stage and discard buttons](docs/screenshots/diff.webp) | ![Commit details with the files it changed](docs/screenshots/commit.webp) |
+| Hunk staging | Commit details |
+| ![Right-click menu on a commit: branch, tag, checkout, cherry-pick, revert, reset](docs/screenshots/menu.webp) | ![Home screen with open, clone and create, recent repositories and accounts](docs/screenshots/home.webp) |
+| Commit actions | Home |
+| ![Clone dialog listing repositories from a signed-in GitHub account](docs/screenshots/clone.webp) | ![Settings with accounts, theme, pull behaviour and updates](docs/screenshots/settings.webp) |
+| Clone from your accounts | Settings |
 
 ## Development
 
@@ -82,6 +95,6 @@ If no system keychain is available (for example a bare window manager without gn
    git tag v0.2.0 && git push origin v0.2.0
    ```
 
-The release workflow builds the AppImage, .deb and .rpm (Linux), the MSI and NSIS installers (Windows) and the .app/.dmg (macOS, Intel and Apple Silicon). It signs the update bundles and publishes `latest.json`. Installed apps check for updates on startup.
+The release workflow builds the AppImage, .deb and .rpm (Linux) and the MSI and NSIS installers (Windows). The workflow signs the update bundles and publishes `latest.json`. Installed apps check for updates on startup.
 
 On Linux, in-place auto-update works for the **AppImage**. The .deb and .rpm packages are updated by your package manager.
