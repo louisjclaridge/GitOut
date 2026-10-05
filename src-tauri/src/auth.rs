@@ -65,10 +65,15 @@ fn client_id(provider: &str, settings: &Settings) -> Result<String> {
         "gitlab" => (&settings.oauth.gitlab_client_id, GITLAB_CLIENT_ID),
         _ => return Err(Error::Auth(format!("{provider} does not support browser sign-in"))),
     };
+    // CI sets the build-time env var to "" when the repository variable is
+    // missing, so an empty built-in ID counts as not configured.
+    fn nonempty(s: &str) -> Option<&str> {
+        Some(s.trim()).filter(|s| !s.is_empty())
+    }
     over.as_deref()
-        .filter(|s| !s.trim().is_empty())
-        .or(built)
-        .map(|s| s.trim().to_string())
+        .and_then(nonempty)
+        .or_else(|| built.and_then(nonempty))
+        .map(str::to_string)
         .ok_or_else(|| {
             Error::Auth(format!(
                 "No {provider} OAuth app is configured for this build. Add a client ID under \

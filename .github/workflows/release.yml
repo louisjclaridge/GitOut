@@ -35,14 +35,26 @@ jobs:
             echo "::error::Tag ${{ github.ref_name }} does not match package.json version $version"
             exit 1
           fi
+      # GitHub browser sign-in is required; GitLab's is optional and falls
+      # back to token sign-in or a client ID entered in Settings.
+      - name: Check GitHub OAuth client ID is set
+        if: vars.GITOUT_GITHUB_CLIENT_ID == ''
+        shell: bash
+        run: |
+          echo "::error::Repository variable GITOUT_GITHUB_CLIENT_ID is not set (Settings → Secrets and variables → Actions → Variables)"
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
+      # Restores the cache warm-cache.yml builds on main. Saving here is
+      # wasted time: a cache saved from a tag is never visible to other tags.
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: release
+          save-if: false
       - name: System dependencies (Linux)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
