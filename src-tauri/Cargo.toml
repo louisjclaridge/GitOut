@@ -1,6 +1,6 @@
 [package]
 name = "gitout"
-version = "0.1.0"
+version = "0.2.1"
 description = "A lightweight, cross-platform git client"
 authors = ["Louis Claridge"]
 edition = "2021"

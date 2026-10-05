@@ -1,13 +1,15 @@
 {
   "name": "gitout",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version": "node scripts/sync-version.mjs && git add src-tauri/Cargo.toml src-tauri/Cargo.lock",
+    "postversion": "git push --follow-tags"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",

@@ -89,11 +89,13 @@ If no system keychain is available (for example a bare window manager without gn
 1. Generate a signing key once: `npx tauri signer generate -w ~/.tauri/gitout.key`. Put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
 2. Add the repository secret `TAURI_SIGNING_PRIVATE_KEY` with the contents of the private key file. If your key has a password, also add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` and pass it to the tauri-action step in `release.yml`.
 3. Set `plugins.updater.endpoints` to `https://github.com/<owner>/GitOut/releases/latest/download/latest.json`.
-4. Bump the version in `package.json`, `src-tauri/Cargo.toml` and `src-tauri/tauri.conf.json`, then push a tag:
+4. On a clean `main`, run one of:
 
    ```bash
-   git tag v0.2.0 && git push origin v0.2.0
+   npm version patch   # or minor, major, or an exact version like 0.3.0
    ```
+
+   This bumps `package.json`, syncs `src-tauri/Cargo.toml` and `Cargo.lock` (`scripts/sync-version.mjs`), commits, tags `vX.Y.Z` and pushes the commit and tag. `tauri.conf.json` reads its version from `package.json`. The release workflow fails if the tag and version don't match.
 
 The release workflow builds the AppImage, .deb and .rpm (Linux) and the MSI and NSIS installers (Windows). The workflow signs the update bundles and publishes `latest.json`. Installed apps check for updates on startup.
 
