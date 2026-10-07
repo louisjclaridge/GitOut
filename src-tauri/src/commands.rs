@@ -35,14 +35,30 @@ struct Progress<'a> {
 /// lines forwarded to the frontend as `git-progress` events.
 async fn network_op(app: AppHandle, state: &AppState, repo: Option<String>, args: Vec<String>) -> Result<String> {
     let accounts = state.store.get().accounts;
-    let env = auth::git_auth_env(&state.tokens, &accounts).await;
-    blocking(move || {
+    let (env, auth_problems) = auth::git_auth_env(&state.tokens, &accounts).await;
+    let result = blocking(move || {
         let label = repo.clone().unwrap_or_default();
         git::run_streaming(repo.as_deref().map(Path::new), &args, env, |line| {
             let _ = app.emit("git-progress", Progress { repo: &label, line });
         })
     })
-    .await
+    .await;
+    // With prompts off, git only says it couldn't ask for a username. Report
+    // the real cause: a signed-in account whose token couldn't be loaded, or
+    // no account for that host at all.
+    match result {
+        Err(Error::Git(msg)) if msg.contains("terminal prompts disabled") => Err(match auth_problems
+            .into_iter()
+            .find(|(host, _)| msg.contains(&format!("//{host}")))
+        {
+            Some((_, problem)) => problem,
+            None => Error::Auth(format!(
+                "{msg}\n\nGit needs credentials for this remote. Sign in to its host under Settings → Accounts, \
+                 or use an SSH remote."
+            )),
+        }),
+        other => other,
+    }
 }
 
 // ---------------------------------------------------------------- settings

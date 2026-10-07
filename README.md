@@ -75,7 +75,7 @@ src-tauri/src/
 
 Browser sign-in needs an OAuth app. The client IDs are public, and the device flow uses no client secret.
 
-- **GitHub**: Settings → Developer settings → OAuth Apps → New. Tick **Enable Device Flow**.
+- **GitHub**: Settings → Developer settings → OAuth Apps (or GitHub Apps) → New. Tick **Enable Device Flow**. GitHub App tokens expire after 8 hours; GitOut refreshes them automatically.
 - **GitLab**: User settings → Applications. Untick **Confidential** and choose the scopes `api`, `read_user` and `write_repository`.
 
 Provide the IDs at build time with the `GITOUT_GITHUB_CLIENT_ID` and `GITOUT_GITLAB_CLIENT_ID` environment variables (the release workflow reads them from repository **variables**), or paste them under **Settings → Advanced** in the app.
@@ -89,14 +89,10 @@ If no system keychain is available (for example a bare window manager without gn
 1. Generate a signing key once: `npx tauri signer generate -w ~/.tauri/gitout.key`. Put the public key in `plugins.updater.pubkey` in `src-tauri/tauri.conf.json`.
 2. Add the repository secret `TAURI_SIGNING_PRIVATE_KEY` with the contents of the private key file. If your key has a password, also add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` and pass it to the tauri-action step in `release.yml`.
 3. Set `plugins.updater.endpoints` to `https://github.com/<owner>/GitOut/releases/latest/download/latest.json`.
-4. On a clean `main`, run one of:
+4. On GitHub, go to **Releases → Draft a new release**, create a new tag like `v0.3.0` on `main`, write the notes and click **Publish release**.
 
-   ```bash
-   npm version patch   # or minor, major, or an exact version like 0.3.0
-   ```
+   The release workflow takes the version from the tag and writes it into `package.json`, `src-tauri/Cargo.toml` and `Cargo.lock` before building (`scripts/sync-version.mjs`). You don't bump or commit anything in the repo, and the version checked into the repo is only used for dev builds. The tag must be a plain `vX.Y.Z`, because the Windows MSI bundler rejects most pre-release suffixes.
 
-   This bumps `package.json`, syncs `src-tauri/Cargo.toml` and `Cargo.lock` (`scripts/sync-version.mjs`), commits, tags `vX.Y.Z` and pushes the commit and tag. `tauri.conf.json` reads its version from `package.json`. The release workflow fails if the tag and version don't match.
-
-The release workflow builds the AppImage, .deb and .rpm (Linux) and the MSI and NSIS installers (Windows). The workflow signs the update bundles and publishes `latest.json`. Installed apps check for updates on startup.
+The release workflow builds the AppImage, .deb and .rpm (Linux) and the MSI and NSIS installers (Windows). It uploads them to your release with the signed update bundles and `latest.json`. Until both builds finish, the latest release has no `latest.json`, so update checks find nothing. Installed apps check for updates on startup.
 
 On Linux, in-place auto-update works for the **AppImage**. The .deb and .rpm packages are updated by your package manager.

@@ -1,12 +1,13 @@
-# Push a tag like v0.2.0 to build signed Linux and Windows installers and
-# publish a GitHub Release. tauri-action also uploads latest.json, which the
-# in-app updater reads.
+# Publish a GitHub Release with a new tag like v0.3.0 (Releases → Draft a new
+# release → choose a tag → Publish). This workflow stamps that version into
+# the app, builds signed Linux and Windows installers and uploads them to the
+# release, along with the latest.json the in-app updater reads. Nothing needs
+# bumping or committing in the repo first.
 name: Release
 
 on:
-  push:
-    tags: ["v*"]
-  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: write
@@ -24,17 +25,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
-      # The updater compares against the app version, not the
-      # tag, so a mismatch publishes a release that never shows up as an update.
-      - name: Check tag matches app version
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: bash
-        run: |
-          version=$(node -p "require('./package.json').version")
-          if [ "v$version" != "${{ github.ref_name }}" ]; then
-            echo "::error::Tag ${{ github.ref_name }} does not match package.json version $version"
-            exit 1
-          fi
       # GitHub browser sign-in is required; GitLab's is optional and falls
       # back to token sign-in or a client ID entered in Settings.
       - name: Check GitHub OAuth client ID is set
@@ -61,6 +51,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf libdbus-1-dev
       - run: npm ci
+      # The updater compares against the app version, so it must come from the
+      # release tag. The repo's own version is only used for dev builds.
+      # Runs after the cache restore and npm ci so the edited lockfiles don't
+      # change the cache key or trip npm's lockfile check.
+      - name: Set app version from release tag
+        shell: bash
+        run: node scripts/sync-version.mjs "${{ github.event.release.tag_name }}"
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -69,9 +66,5 @@ jobs:
           GITOUT_GITHUB_CLIENT_ID: ${{ vars.GITOUT_GITHUB_CLIENT_ID }}
           GITOUT_GITLAB_CLIENT_ID: ${{ vars.GITOUT_GITLAB_CLIENT_ID }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: GitOut ${{ github.ref_name }}
-          releaseBody: See the assets below to download GitOut for your platform.
-          releaseDraft: false
-          prerelease: false
+          releaseId: ${{ github.event.release.id }}
           args: ${{ matrix.args }}

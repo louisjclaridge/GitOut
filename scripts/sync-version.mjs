@@ -1,9 +1,16 @@
-// Runs from `npm version`: copies the new package.json version into
-// Cargo.toml and Cargo.lock so the Rust crate matches the app.
-// tauri.conf.json reads its version from package.json directly.
+// Stamps a release version into the app before building:
+//   node scripts/sync-version.mjs 0.3.0
+// The release workflow runs this with the version from the GitHub Release
+// tag, so versions are never bumped or committed by hand. Writes package.json
+// (which tauri.conf.json reads its version from), Cargo.toml and Cargo.lock.
 import { readFileSync, writeFileSync } from "node:fs";
 
-const { version } = JSON.parse(readFileSync("package.json", "utf8"));
+const version = process.argv[2]?.replace(/^v/, "");
+// Plain X.Y.Z only: the Windows MSI bundler rejects most pre-release suffixes.
+if (!version || !/^\d+\.\d+\.\d+$/.test(version)) {
+  console.error(`Expected a version like 1.2.3, got "${process.argv[2] ?? ""}"`);
+  process.exit(1);
+}
 
 function replace(path, pattern) {
   const text = readFileSync(path, "utf8");
@@ -11,6 +18,7 @@ function replace(path, pattern) {
   writeFileSync(path, text.replace(pattern, `$1${version}$2`));
 }
 
+replace("package.json", /(\n  "version": ")[^"]+(")/);
 replace("src-tauri/Cargo.toml", /(\[package\][^[]*?\nversion = ")[^"]+(")/);
 replace("src-tauri/Cargo.lock", /(\nname = "gitout"\nversion = ")[^"]+(")/);
-console.log(`Synced Cargo version to ${version}`);
+console.log(`Set app version to ${version}`);

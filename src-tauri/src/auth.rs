@@ -102,11 +102,13 @@ pub struct Token {
 
 pub struct TokenStore {
     fallback: PathBuf,
+    /// Held while refreshing an expired token; see `access_token`.
+    refresh_lock: tokio::sync::Mutex<()>,
 }
 
 impl TokenStore {
     pub fn new(config_dir: &Path) -> Self {
-        Self { fallback: config_dir.join("tokens.json") }
+        Self { fallback: config_dir.join("tokens.json"), refresh_lock: Default::default() }
     }
 
     fn read_fallback(&self) -> std::collections::HashMap<String, Token> {
@@ -143,11 +145,30 @@ impl TokenStore {
     }
 
     pub fn load(&self, id: &str) -> Option<Token> {
-        keyring::Entry::new(KEYRING_SERVICE, id)
-            .and_then(|e| e.get_password())
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .or_else(|| self.read_fallback().remove(id))
+        self.try_load(id).ok()
+    }
+
+    /// Like `load`, but says why the token couldn't be read (e.g. a locked
+    /// or unreachable keychain) instead of just returning nothing.
+    pub fn try_load(&self, id: &str) -> std::result::Result<Token, String> {
+        let keychain = keyring::Entry::new(KEYRING_SERVICE, id).and_then(|e| e.get_password());
+        if let Ok(json) = &keychain {
+            match serde_json::from_str(json) {
+                Ok(tok) => return Ok(tok),
+                Err(e) => eprintln!("unreadable token for {id} in keychain: {e}"),
+            }
+        }
+        if let Some(tok) = self.read_fallback().remove(id) {
+            return Ok(tok);
+        }
+        match keychain {
+            Err(keyring::Error::NoEntry) => Err("no saved token was found".into()),
+            Err(e) => {
+                eprintln!("keychain read failed for {id}: {e}");
+                Err(format!("the system keychain couldn't be read ({e})"))
+            }
+            Ok(_) => Err("the saved token is unreadable".into()),
+        }
     }
 
     pub fn delete(&self, id: &str) {
@@ -161,49 +182,93 @@ impl TokenStore {
     }
 }
 
+fn expiring(tok: &Token) -> bool {
+    tok.expires_at.is_some_and(|t| t - 60 < now())
+}
+
 /// Return a usable access token for `account`, refreshing it first if it is
-/// about to expire (GitLab OAuth tokens last two hours).
+/// about to expire. GitLab OAuth tokens last two hours; GitHub App tokens last
+/// eight (GitHub OAuth App tokens don't expire).
 pub async fn access_token(tokens: &TokenStore, account: &Account) -> Result<String> {
-    let mut tok = tokens
-        .load(&account.id)
-        .ok_or_else(|| Error::Auth(format!("No saved credentials for {}; please sign in again", account.username)))?;
-    let expiring = tok.expires_at.is_some_and(|t| t - 60 < now());
-    if expiring && account.provider == "gitlab" {
-        if let (Some(refresh), Some(cid)) = (tok.refresh_token.clone(), tok.client_id.clone()) {
-            let resp: TokenResponse = http()
-                .post(format!("https://{}/oauth/token", account.host))
-                .form(&[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", &cid)])
-                .send()
-                .await?
-                .json()
-                .await?;
-            let access = resp.access_token.ok_or_else(|| {
-                Error::Auth(format!("GitLab session for {} expired; please sign in again", account.username))
-            })?;
-            tok = Token {
-                access_token: access,
-                refresh_token: resp.refresh_token.or(Some(refresh)),
-                expires_at: resp.expires_in.map(|e| now() + e),
-                client_id: Some(cid),
-                login: tok.login.clone(),
-            };
-            tokens.save(&account.id, &tok)?;
-        }
+    let load = || {
+        tokens.try_load(&account.id).map_err(|why| {
+            Error::Auth(format!(
+                "Couldn't load the saved credentials for {} on {}: {why}. Try signing in again.",
+                account.username, account.host
+            ))
+        })
+    };
+    let tok = load()?;
+    if !expiring(&tok) {
+        return Ok(tok.access_token);
     }
+    // A refresh token works once, so concurrent git operations must not
+    // refresh in parallel. Reload under the lock in case another just did.
+    let _guard = tokens.refresh_lock.lock().await;
+    let tok = load()?;
+    if !expiring(&tok) {
+        return Ok(tok.access_token);
+    }
+    let expired = || {
+        Error::Auth(format!(
+            "Your {} session for {} expired. Sign in again under Settings → Accounts.",
+            account.host, account.username
+        ))
+    };
+    let (Some(refresh), Some(cid)) = (tok.refresh_token.clone(), tok.client_id.clone()) else {
+        return Err(expired());
+    };
+    let url = match account.provider.as_str() {
+        "github" => format!("https://{}/login/oauth/access_token", account.host),
+        "gitlab" => format!("https://{}/oauth/token", account.host),
+        _ => return Err(expired()),
+    };
+    // Device-flow tokens refresh without a client secret on both providers.
+    let resp: TokenResponse = http()
+        .post(url)
+        .header("Accept", "application/json")
+        .form(&[("grant_type", "refresh_token"), ("refresh_token", &refresh), ("client_id", &cid)])
+        .send()
+        .await?
+        .json()
+        .await?;
+    let Some(access) = resp.access_token else {
+        eprintln!("token refresh failed for {}: {:?} {:?}", account.id, resp.error, resp.error_description);
+        return Err(expired());
+    };
+    let tok = Token {
+        access_token: access,
+        refresh_token: resp.refresh_token.or(Some(refresh)),
+        expires_at: resp.expires_in.map(|e| now() + e),
+        client_id: Some(cid),
+        login: tok.login,
+    };
+    tokens.save(&account.id, &tok)?;
     Ok(tok.access_token)
 }
 
 /// Environment that makes git send each signed-in account's token to its host
 /// over HTTPS. Uses GIT_CONFIG_* env vars (git ≥ 2.31) so tokens never appear
 /// in process arguments, and only applies to URLs under that exact host.
-pub async fn git_auth_env(tokens: &TokenStore, accounts: &[Account]) -> Vec<(String, String)> {
+///
+/// Also returns, per host, why an account's token couldn't be used, so a failed git
+/// call can report that instead of git's "terminal prompts disabled".
+pub async fn git_auth_env(tokens: &TokenStore, accounts: &[Account]) -> (Vec<(String, String)>, Vec<(String, Error)>) {
     let mut env = vec![];
+    let mut problems = vec![];
     let mut seen = std::collections::HashSet::new();
     for acc in accounts {
         if !seen.insert(acc.host.clone()) {
             continue;
         }
-        let Ok(token) = access_token(tokens, acc).await else { continue };
+        let token = match access_token(tokens, acc).await {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("no git credentials for {}: {e}", acc.id);
+                problems.push((acc.host.clone(), e));
+                continue;
+            }
+        };
         let basic = base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", acc.git_user, token));
         let i = env.len() / 2;
         env.push((format!("GIT_CONFIG_KEY_{i}"), format!("http.https://{}/.extraHeader", acc.host)));
@@ -212,7 +277,7 @@ pub async fn git_auth_env(tokens: &TokenStore, accounts: &[Account]) -> Vec<(Str
     if !env.is_empty() {
         env.push(("GIT_CONFIG_COUNT".into(), (env.len() / 2).to_string()));
     }
-    env
+    (env, problems)
 }
 
 // ---------------------------------------------------------------- device flow

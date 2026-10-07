@@ -7,9 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "tauri": "tauri",
-    "version": "node scripts/sync-version.mjs && git add src-tauri/Cargo.toml src-tauri/Cargo.lock",
-    "postversion": "git push --follow-tags"
+    "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",
