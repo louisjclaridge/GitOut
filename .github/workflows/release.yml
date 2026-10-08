@@ -38,8 +38,9 @@ jobs:
           node-version: 22
           cache: npm
       - uses: dtolnay/rust-toolchain@stable
-      # Restores the cache warm-cache.yml builds on main. Saving here is
-      # wasted time: a cache saved from a tag is never visible to other tags.
+      # Restores the cache ci.yml's release-cache job builds on main. Saving
+      # here is wasted time: a cache saved from a tag is never visible to
+      # other tags.
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri

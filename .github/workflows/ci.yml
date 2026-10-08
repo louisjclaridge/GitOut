@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Weekly, so the release cache picks up new stable Rust and doesn't expire
+  # after 7 days unused.
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
 
 jobs:
   check:
@@ -26,3 +31,34 @@ jobs:
       - run: npm run check
       - run: npm run build
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  # Builds the release profile on main so release.yml can reuse the compiled
+  # dependencies. A release's run can only restore caches from its own tag or
+  # the default branch, so caches saved by release runs are never reused.
+  # rust-cache only saves when the key (Cargo.lock + Rust version) changes.
+  release-cache:
+    if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          shared-key: release
+      - name: System dependencies (Linux)
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf libdbus-1-dev
+      - run: npm ci
+      # Same cargo invocation as tauri-action, without bundling or signing.
+      - run: npx tauri build --no-bundle

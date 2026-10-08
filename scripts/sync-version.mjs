@@ -18,7 +18,8 @@ function replace(path, pattern) {
   writeFileSync(path, text.replace(pattern, `$1${version}$2`));
 }
 
-replace("package.json", /(\n  "version": ")[^"]+(")/);
-replace("src-tauri/Cargo.toml", /(\[package\][^[]*?\nversion = ")[^"]+(")/);
-replace("src-tauri/Cargo.lock", /(\nname = "gitout"\nversion = ")[^"]+(")/);
+// Windows checkouts have CRLF line endings, hence \r?\n.
+replace("package.json", /(\r?\n  "version": ")[^"]+(")/);
+replace("src-tauri/Cargo.toml", /(\[package\][^[]*?\r?\nversion = ")[^"]+(")/);
+replace("src-tauri/Cargo.lock", /(\r?\nname = "gitout"\r?\nversion = ")[^"]+(")/);
 console.log(`Set app version to ${version}`);
