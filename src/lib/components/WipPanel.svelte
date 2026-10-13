@@ -102,7 +102,7 @@
   <div class="lists">
     {#if conflicted.length}
       <div class="head conflict">
-        <span class="section-title">Conflicts ({conflicted.length})</span>
+        <span class="k-label"><Icon name="warning" size={14} /> Conflicts <span class="n">{conflicted.length}</span></span>
       </div>
       {#each conflicted as f (f.path)}
         <FileRow
@@ -113,8 +113,8 @@
           oncontextmenu={(e) => showMenu(e, fileMenu(f, "conflict"))}
         >
           {#snippet actions()}
-            <button class="btn small" title="Mark as resolved" onclick={(e) => { e.stopPropagation(); run(() => api.stage(store.path, [f.path])); }}>
-              Resolved
+            <button class="k-btn" title="Mark as resolved" onclick={(e) => { e.stopPropagation(); run(() => api.stage(store.path, [f.path])); }}>
+              Mark resolved
             </button>
           {/snippet}
         </FileRow>
@@ -122,11 +122,11 @@
     {/if}
 
     <div class="head">
-      <span class="section-title">Unstaged ({unstaged.length})</span>
+      <span class="k-label">Unstaged <span class="n">{unstaged.length}</span></span>
       <span class="head-actions">
         {#if unstaged.length}
-          <button class="btn small ghost" title="Discard all unstaged changes" onclick={() => discard(unstaged)}><Icon name="undo" size={13} /></button>
-          <button class="btn small" onclick={() => run(() => api.stage(store.path, unstaged.map((f) => f.path)))}>Stage all</button>
+          <button class="k-icon-btn" aria-label="Discard all unstaged changes" title="Discard all unstaged changes" onclick={() => discard(unstaged)}><Icon name="undo" /></button>
+          <button class="k-btn" onclick={() => run(() => api.stage(store.path, unstaged.map((f) => f.path)))}>Stage all</button>
         {/if}
       </span>
     </div>
@@ -139,8 +139,8 @@
         oncontextmenu={(e) => showMenu(e, fileMenu(f, "unstaged"))}
       >
         {#snippet actions()}
-          <button class="btn ghost icon" title="Discard" onclick={(e) => { e.stopPropagation(); discard([f]); }}><Icon name="undo" size={13} /></button>
-          <button class="btn ghost icon" title="Stage" onclick={(e) => { e.stopPropagation(); run(() => api.stage(store.path, [f.path])); }}><Icon name="plus" size={14} /></button>
+          <button class="k-icon-btn" aria-label="Discard changes" title="Discard changes" onclick={(e) => { e.stopPropagation(); discard([f]); }}><Icon name="undo" /></button>
+          <button class="k-icon-btn" aria-label="Stage" title="Stage" onclick={(e) => { e.stopPropagation(); run(() => api.stage(store.path, [f.path])); }}><Icon name="plus" /></button>
         {/snippet}
       </FileRow>
     {:else}
@@ -148,9 +148,9 @@
     {/each}
 
     <div class="head">
-      <span class="section-title">Staged ({staged.length})</span>
+      <span class="k-label">Staged <span class="n">{staged.length}</span></span>
       {#if staged.length}
-        <button class="btn small" onclick={() => run(() => api.unstage(store.path, staged.map((f) => f.path)))}>Unstage all</button>
+        <button class="k-btn" onclick={() => run(() => api.unstage(store.path, staged.map((f) => f.path)))}>Unstage all</button>
       {/if}
     </div>
     {#each staged as f (f.path)}
@@ -162,7 +162,7 @@
         oncontextmenu={(e) => showMenu(e, fileMenu(f, "staged"))}
       >
         {#snippet actions()}
-          <button class="btn ghost icon" title="Unstage" onclick={(e) => { e.stopPropagation(); run(() => api.unstage(store.path, [f.path])); }}><Icon name="minus" size={14} /></button>
+          <button class="k-icon-btn" aria-label="Unstage" title="Unstage" onclick={(e) => { e.stopPropagation(); run(() => api.unstage(store.path, [f.path])); }}><Icon name="minus" /></button>
         {/snippet}
       </FileRow>
     {:else}
@@ -179,33 +179,37 @@
   >
     <div class="summary">
       <input
+        class="k-input"
         placeholder="Commit summary"
+        aria-label="Commit summary"
         bind:value={summary}
         maxlength="200"
         onkeydown={(e) => (e.ctrlKey || e.metaKey) && e.key === "Enter" && commit()}
       />
-      <span class="count" class:over={summary.length > 72}>{summary.length}</span>
+      <span class="count" class:over={summary.length > 72} title="72 characters or fewer reads best">{summary.length}</span>
     </div>
     <textarea
+      class="k-input"
       placeholder="Description (optional)"
+      aria-label="Description"
       rows="4"
       bind:value={body}
       onkeydown={(e) => (e.ctrlKey || e.metaKey) && e.key === "Enter" && commit()}
     ></textarea>
-    <label class="amend"><input type="checkbox" checked={amend} onchange={toggleAmend} /> Amend previous commit</label>
-    <button class="btn primary big" type="submit" disabled={!canCommit}>
-      <Icon name="check" size={15} />
+    <label class="k-check"><input type="checkbox" checked={amend} onchange={toggleAmend} /><span>Amend previous commit</span></label>
+    <button class="k-btn primary block" type="submit" disabled={!canCommit}>
+      {#if committing}<span class="k-spinner"></span>{:else}<Icon name="check" />{/if}
       {#if conflicted.length}
         Resolve conflicts first
       {:else if amend}
         Amend commit
       {:else if !staged.length && unstaged.length}
-        Stage all & commit
+        Stage all and commit
       {:else}
         Commit {staged.length} file{staged.length === 1 ? "" : "s"}
       {/if}
     </button>
-    <div class="hint muted">Ctrl+Enter to commit</div>
+    <div class="hint"><kbd class="k-kbd">Ctrl</kbd> <kbd class="k-kbd">Enter</kbd> to commit</div>
   </form>
 </div>
 
@@ -219,71 +223,80 @@
   .lists {
     flex: 1;
     overflow: auto;
-    padding-bottom: 8px;
+    padding-bottom: var(--space-8);
   }
   .head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 10px 6px 12px;
+    gap: var(--space-8);
+    min-height: 44px;
+    padding: var(--space-8) var(--space-8) var(--space-4) var(--space-16);
     position: sticky;
     top: 0;
-    background: var(--panel);
+    background: var(--surface);
     z-index: 1;
   }
-  .head.conflict .section-title {
+  .head .k-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-6);
+  }
+  .head .n {
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+  }
+  .head.conflict .k-label {
     color: var(--danger);
   }
   .head-actions {
     display: flex;
-    gap: 4px;
+    gap: var(--space-4);
   }
   .none {
-    padding: 4px 12px;
-    color: var(--faint);
+    padding: var(--space-4) var(--space-16);
+    color: var(--text-3);
     font-size: 12px;
   }
   .commit {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 12px;
+    gap: var(--space-8);
+    padding: var(--space-12);
     border-top: 1px solid var(--border);
   }
   .summary {
     position: relative;
   }
-  .summary input {
-    padding-right: 38px;
+  .summary .k-input {
+    padding-right: 40px;
     font-weight: 500;
   }
   .count {
     position: absolute;
-    right: 9px;
+    right: var(--space-12);
     top: 50%;
     transform: translateY(-50%);
-    font-size: 11px;
-    color: var(--faint);
+    font-size: 12px;
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
   }
   .count.over {
-    color: var(--warn);
+    color: var(--warning);
   }
   textarea {
-    resize: vertical;
-    min-height: 60px;
+    min-height: 64px;
   }
-  .amend {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    color: var(--muted);
+  .k-check {
+    color: var(--text-2);
   }
-  .big {
-    padding: 9px;
+  .k-btn.primary {
     font-weight: 600;
   }
   .hint {
-    font-size: 11px;
+    font-size: 12px;
+    line-height: 16px;
     text-align: center;
+    color: var(--text-3);
   }
 </style>

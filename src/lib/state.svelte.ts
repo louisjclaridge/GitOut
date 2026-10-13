@@ -50,7 +50,8 @@ let toastId = 0;
 export function toast(text: string, kind: Toast["kind"] = "info") {
   const id = ++toastId;
   app.toasts.push({ id, kind, text });
-  setTimeout(() => dismissToast(id), kind === "error" ? 9000 : 3500);
+  // Keel: events fade after 4s; errors stay until dismissed.
+  if (kind !== "error") setTimeout(() => dismissToast(id), 4000);
 }
 export function dismissToast(id: number) {
   app.toasts = app.toasts.filter((t) => t.id !== id);

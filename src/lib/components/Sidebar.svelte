@@ -32,70 +32,84 @@
 </script>
 
 {#snippet header(key: string, label: string, count: number)}
-  <button class="head" onclick={() => toggle(key)}>
+  <button class="head" aria-expanded={open[key]} onclick={() => toggle(key)}>
     <span class="chev" class:open={open[key]}><Icon name="chevron" size={12} /></span>
-    <span class="section-title">{label}</span>
+    <span class="k-label">{label}</span>
     <span class="n">{count}</span>
   </button>
 {/snippet}
 
 {#snippet refRow(r: Ref, label: string, indent = false)}
   <button
-    class="item"
-    class:current={r.current}
+    class="k-item"
     class:indent
+    aria-current={r.current ? "true" : undefined}
     title={r.short}
     onclick={() => store.selectCommit(r.target)}
     ondblclick={() => store.checkout(r)}
     oncontextmenu={(e) => showMenu(e, store.refMenu(r))}
   >
-    {#if r.current}<Icon name="check" size={13} />{:else}<span class="dot"></span>{/if}
-    <span class="ellipsis label">{label}</span>
-    {#if r.ahead}<span class="ab" title="{r.ahead} to push">↑{r.ahead}</span>{/if}
-    {#if r.behind}<span class="ab" title="{r.behind} to pull">↓{r.behind}</span>{/if}
+    <Icon name={r.current ? "check" : r.kind === "tag" ? "tag" : "branch"} size={14} />
+    <span class="name">{label}</span>
+    {#if r.ahead || r.behind}
+      <span class="meta">
+        {#if r.ahead}<span title="{r.ahead} to push">↑{r.ahead}</span>{/if}
+        {#if r.behind}<span title="{r.behind} to pull">↓{r.behind}</span>{/if}
+      </span>
+    {/if}
   </button>
 {/snippet}
 
 <nav class="sidebar">
-  <div class="filter">
-    <Icon name="search" size={13} />
-    <input placeholder="Filter branches" bind:value={filter} spellcheck="false" />
+  <div class="filter k-search">
+    <Icon name="search" size={14} />
+    <input class="k-input" placeholder="Filter branches" aria-label="Filter branches" bind:value={filter} spellcheck="false" />
   </div>
 
   <div class="scroll">
     {@render header("local", "Local", local.length)}
     {#if open.local}
-      {#each local as r (r.name)}{@render refRow(r, r.short)}{/each}
-      {#if !local.length}<div class="none">No branches yet</div>{/if}
+      <div class="k-list">
+        {#each local as r (r.name)}{@render refRow(r, r.short)}{/each}
+        {#if !local.length}<div class="none">No branches yet</div>{/if}
+      </div>
     {/if}
 
     {@render header("remote", "Remote", remotes.reduce((n, [, l]) => n + l.length, 0))}
     {#if open.remote}
-      {#each remotes as [name, list] (name)}
-        <div class="remote-name"><Icon name="cloud" size={13} /> {name}</div>
-        {#each list as r (r.name)}{@render refRow(r, r.short.slice(name.length + 1), true)}{/each}
-      {/each}
-      {#if !remotes.length}<div class="none">No remotes</div>{/if}
+      <div class="k-list">
+        {#each remotes as [name, list] (name)}
+          <div class="remote-name"><Icon name="cloud" size={14} /> {name}</div>
+          {#each list as r (r.name)}{@render refRow(r, r.short.slice(name.length + 1), true)}{/each}
+        {/each}
+        {#if !remotes.length}<div class="none">No remotes</div>{/if}
+      </div>
     {/if}
 
     {@render header("tags", "Tags", tags.length)}
     {#if open.tags}
-      {#each tags as r (r.name)}{@render refRow(r, r.short)}{/each}
+      <div class="k-list">
+        {#each tags as r (r.name)}{@render refRow(r, r.short)}{/each}
+        {#if !tags.length}<div class="none">No tags</div>{/if}
+      </div>
     {/if}
 
     {@render header("stashes", "Stashes", store.stashes.length)}
     {#if open.stashes}
-      {#each store.stashes as s (s.hash)}
-        <button
-          class="item"
-          title={s.message}
-          onclick={() => store.select({ kind: "commit", hash: s.hash })}
-          oncontextmenu={(e) => showMenu(e, store.stashMenu(s))}
-        >
-          <Icon name="stash" size={13} />
-          <span class="ellipsis label">{s.message.replace(/^On [^:]+: /, "").replace(/^WIP on [^:]+: /, "")}</span>
-        </button>
-      {/each}
+      <div class="k-list">
+        {#each store.stashes as s (s.hash)}
+          <button
+            class="k-item"
+            title={s.message}
+            onclick={() => store.select({ kind: "commit", hash: s.hash })}
+            oncontextmenu={(e) => showMenu(e, store.stashMenu(s))}
+          >
+            <Icon name="stash" size={14} />
+            <span class="name">{s.message.replace(/^On [^:]+: /, "").replace(/^WIP on [^:]+: /, "")}</span>
+          </button>
+        {/each}
+        {#if !store.stashes.length}<div class="none">No stashes</div>{/if}
+      </div>
     {/if}
   </div>
 </nav>
@@ -105,44 +119,30 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: var(--panel);
+    background: var(--bg);
     border-right: 1px solid var(--border);
   }
   .filter {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 10px;
-    padding: 0 8px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--bg);
-    color: var(--muted);
-  }
-  .filter input {
-    border: 0;
-    padding: 5px 0;
-    background: none;
-    box-shadow: none;
+    margin: var(--space-8);
   }
   .scroll {
     flex: 1;
     overflow: auto;
-    padding: 0 6px 12px;
+    padding-bottom: var(--space-12);
   }
   .head {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-6);
     width: 100%;
-    padding: 8px 6px 4px;
+    padding: var(--space-12) var(--space-16) var(--space-6) var(--space-12);
     border: 0;
     background: none;
   }
   .chev {
     display: inline-flex;
-    color: var(--muted);
-    transition: transform 0.1s;
+    color: var(--text-3);
+    transition: transform 120ms ease;
   }
   .chev.open {
     transform: rotate(90deg);
@@ -150,57 +150,29 @@
   .n {
     margin-left: auto;
     font-size: 11px;
-    color: var(--faint);
+    color: var(--text-3);
+    font-variant-numeric: tabular-nums;
   }
-  .item {
+  .k-item.indent {
+    padding-left: var(--space-24);
+  }
+  .meta {
     display: flex;
-    align-items: center;
-    gap: 7px;
-    width: 100%;
-    padding: 4px 8px 4px 22px;
-    border: 0;
-    border-radius: 5px;
-    background: none;
-    text-align: left;
-    min-width: 0;
-  }
-  .item.indent {
-    padding-left: 34px;
-  }
-  .item:hover {
-    background: var(--hover);
-  }
-  .item.current {
-    color: var(--accent);
-    font-weight: 600;
-  }
-  .label {
-    flex: 1;
-  }
-  .dot {
-    width: 6px;
-    height: 6px;
-    margin: 0 3.5px;
-    border-radius: 50%;
-    background: var(--faint);
-    flex-shrink: 0;
-  }
-  .ab {
-    font-size: 10.5px;
-    color: var(--muted);
+    gap: var(--space-4);
     font-variant-numeric: tabular-nums;
   }
   .remote-name {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 4px 8px 2px 22px;
-    color: var(--muted);
+    gap: var(--space-8);
+    height: 28px;
+    padding: 0 var(--space-8);
+    color: var(--text-2);
     font-size: 12px;
   }
   .none {
-    padding: 2px 8px 4px 24px;
-    color: var(--faint);
+    padding: var(--space-2) var(--space-8) var(--space-4);
+    color: var(--text-3);
     font-size: 12px;
   }
 </style>

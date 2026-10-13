@@ -14,7 +14,7 @@
   .logo {
     display: inline-grid;
     place-items: center;
-    border-radius: 4px;
+    border-radius: var(--radius-xs);
     font-weight: 700;
     color: #fff;
     flex-shrink: 0;

@@ -58,72 +58,79 @@
 />
 
 <div class="shell">
-  <header class="tabs">
+  <header class="topbar">
     <button
-      class="tab home"
-      class:active={app.view === "welcome"}
-      title="Home"
+      class="k-icon-btn"
+      aria-pressed={app.view === "welcome"}
+      aria-label="Home"
+      title="Home (Ctrl+T)"
       onclick={() => (app.view = "welcome")}
     >
-      <Icon name="home" size={15} />
+      <Icon name="home" />
     </button>
-    <div class="tab-strip">
-      {#each app.tabs as t (t.path)}
-        <div
-          class="tab"
-          class:active={app.view === "repo" && app.active === t.path}
-          title={t.path}
-          role="tab"
-          tabindex="0"
-          aria-selected={app.active === t.path}
-          onclick={() => selectTab(t.path)}
-          onkeydown={(e) => e.key === "Enter" && selectTab(t.path)}
-          onauxclick={(e) => e.button === 1 && closeTab(t.path)}
-        >
-          <Icon name="folder" size={13} />
-          <span class="ellipsis">{t.name}</span>
-          <button
-            class="close"
-            aria-label="Close {t.name}"
-            onclick={(e) => {
-              e.stopPropagation();
-              closeTab(t.path);
-            }}><Icon name="x" size={12} /></button
+    {#if app.tabs.length}
+      <div class="k-tabs sessions session-tabs" role="tablist" aria-label="Open repositories">
+        {#each app.tabs as t (t.path)}
+          {@const selected = app.view === "repo" && app.active === t.path}
+          <div
+            class="k-tab"
+            title={t.path}
+            role="tab"
+            tabindex="0"
+            aria-selected={selected}
+            onclick={() => selectTab(t.path)}
+            onkeydown={(e) => e.key === "Enter" && selectTab(t.path)}
+            onauxclick={(e) => e.button === 1 && closeTab(t.path)}
           >
-        </div>
-      {/each}
-      <button class="new-tab" title="New tab (Ctrl+T)" aria-label="New tab" onclick={() => (app.view = "welcome")}>
-        <Icon name="plus" size={14} />
-      </button>
-    </div>
+            <Icon name="folder" size={14} />
+            <span class="ellipsis">{t.name}</span>
+            <button
+              class="close"
+              aria-label="Close {t.name}"
+              onclick={(e) => {
+                e.stopPropagation();
+                closeTab(t.path);
+              }}><Icon name="x" size={12} /></button
+            >
+          </div>
+        {/each}
+      </div>
+    {/if}
+    <button class="k-icon-btn" title="New tab (Ctrl+T)" aria-label="New tab" onclick={() => (app.view = "welcome")}>
+      <Icon name="plus" />
+    </button>
+    <span class="spacer"></span>
     <button
-      class="tab home"
-      class:active={app.view === "settings"}
-      title="Settings & accounts"
+      class="k-icon-btn"
+      aria-pressed={app.view === "settings"}
+      aria-label="Settings"
+      title="Settings and accounts"
       onclick={() => (app.view = "settings")}
     >
-      <Icon name="settings" size={15} />
+      <Icon name="settings" />
     </button>
   </header>
 
   {#if app.update}
-    <div class="update-bar">
-      <Icon name="download" size={14} />
-      <span>GitOut {app.update.version} is available.</span>
-      <button
-        class="btn small primary"
-        disabled={installing}
-        onclick={async () => {
-          installing = true;
-          try {
-            await app.update?.install();
-          } catch (e) {
-            toast(errorText(e), "error");
-            installing = false;
-          }
-        }}>{installing ? "Installing…" : "Restart & update"}</button
-      >
-      <button class="btn small ghost" onclick={() => (app.update = null)}>Later</button>
+    <div class="update">
+      <div class="k-banner">
+        <Icon name="download" size={20} />
+        <div class="body">GitOut {app.update.version} is available.</div>
+        <button class="k-btn ghost" onclick={() => (app.update = null)}>Later</button>
+        <button
+          class="k-btn primary"
+          disabled={installing}
+          onclick={async () => {
+            installing = true;
+            try {
+              await app.update?.install();
+            } catch (e) {
+              toast(errorText(e), "error");
+              installing = false;
+            }
+          }}>{#if installing}<span class="k-spinner"></span> Installing…{:else}Restart and update{/if}</button
+        >
+      </div>
     </div>
   {/if}
 
@@ -141,11 +148,11 @@
 
   <footer class="status">
     {#if app.busy}
-      <span class="spinner"></span>
+      <span class="k-spinner" role="status" aria-label={app.busy}></span>
       <span>{app.busy}</span>
-      {#if app.progress}<span class="muted ellipsis">— {app.progress}</span>{/if}
+      {#if app.progress}<span class="progress mono ellipsis">{app.progress}</span>{/if}
     {:else}
-      <span class="muted">{app.gitVersion ?? ""}</span>
+      <span class="progress">{app.gitVersion ?? ""}</span>
     {/if}
   </footer>
 </div>
@@ -160,96 +167,42 @@
     flex-direction: column;
     height: 100%;
   }
-  .tabs {
+  .topbar {
     flex-shrink: 0;
     display: flex;
-    align-items: stretch;
-    height: 38px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-  }
-  .tab-strip {
-    flex: 1;
-    display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tab {
-    display: flex;
     align-items: center;
-    gap: 7px;
+    gap: var(--space-4);
+    height: var(--titlebar-height);
+    padding: 0 var(--space-8);
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    z-index: var(--layer-titlebar);
+  }
+  .session-tabs {
     min-width: 0;
-    max-width: 220px;
-    padding: 0 8px 0 12px;
+    flex: 0 1 auto;
+  }
+  .session-tabs .k-tab {
+    min-width: 0;
+    padding-right: var(--space-6);
+  }
+  .session-tabs .close {
+    padding: 0;
     border: 0;
-    border-right: 1px solid var(--border);
     background: none;
-    color: var(--muted);
-    position: relative;
+    margin-right: 0;
+    flex: none;
   }
-  .tab:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-  .tab.active {
-    background: var(--bg);
-    color: var(--text);
-  }
-  .tab.active::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    height: 2px;
-    background: var(--accent);
-  }
-  .tab.home {
-    padding: 0 13px;
-  }
-  .tab.home:last-child {
-    border-right: 0;
-    border-left: 1px solid var(--border);
-  }
-  .new-tab {
-    display: flex;
-    align-items: center;
-    align-self: center;
-    flex-shrink: 0;
-    margin: 0 6px;
-    padding: 5px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--muted);
-  }
-  .new-tab:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-  .close {
-    display: inline-flex;
-    padding: 3px;
-    border: 0;
-    border-radius: 4px;
-    background: none;
-    color: inherit;
-    opacity: 0.5;
-  }
-  .close:hover {
-    opacity: 1;
-    background: var(--hover);
-  }
-  .update-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 14px;
-    background: var(--accent-soft);
-    border-bottom: 1px solid var(--border);
-  }
-  .update-bar span {
+  .spacer {
     flex: 1;
+  }
+  .update {
+    flex-shrink: 0;
+    padding: var(--space-8) var(--space-8) 0;
+    background: var(--bg);
+  }
+  .update .k-banner {
+    padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
   }
   main {
     flex: 1;
@@ -259,26 +212,22 @@
   .status {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
     height: 24px;
-    padding: 0 12px;
-    font-size: 11.5px;
-    background: var(--panel);
+    padding: 0 var(--space-12);
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-2);
+    background: var(--bg);
     border-top: 1px solid var(--border);
     min-width: 0;
   }
-  .spinner {
-    width: 11px;
-    height: 11px;
-    border: 2px solid var(--accent);
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    flex-shrink: 0;
+  .status .k-spinner {
+    width: 12px;
+    height: 12px;
   }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
+  .progress {
+    color: var(--text-3);
+    min-width: 0;
   }
 </style>

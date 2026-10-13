@@ -29,70 +29,75 @@
 <div class="welcome">
   <div class="inner">
     <div class="brand">
-      <img src="/logo.svg" alt="" width="44" height="44" />
+      <img src="/logo.svg" alt="" width="48" height="48" />
       <div>
         <h1>GitOut</h1>
-        <p class="muted">A small, fast git client.</p>
+        <p>A small, fast git client.</p>
       </div>
     </div>
 
     <div class="actions">
       <button class="card" onclick={pickAndOpen}>
-        <Icon name="folder" size={22} />
-        <strong>Open</strong>
-        <span class="muted">a repository on this computer</span>
+        <span class="art"><Icon name="folder-open" size={20} /></span>
+        <span class="what">
+          <strong>Open…</strong>
+          <span class="desc">A repository on this computer</span>
+        </span>
       </button>
       <button class="card" onclick={() => (cloning = true)}>
-        <Icon name="download" size={22} />
-        <strong>Clone</strong>
-        <span class="muted">from GitHub, GitLab, Bitbucket or a URL</span>
+        <span class="art"><Icon name="download" size={20} /></span>
+        <span class="what">
+          <strong>Clone…</strong>
+          <span class="desc">From GitHub, GitLab, Bitbucket or a URL</span>
+        </span>
       </button>
       <button class="card" onclick={pickAndInit}>
-        <Icon name="plus" size={22} />
-        <strong>Create</strong>
-        <span class="muted">a new repository</span>
+        <span class="art"><Icon name="folder-plus" size={20} /></span>
+        <span class="what">
+          <strong>Create…</strong>
+          <span class="desc">A new, empty repository</span>
+        </span>
       </button>
     </div>
 
     <div class="columns">
-      <section>
-        <div class="section-title">Recent</div>
-        {#if app.settings?.recentRepos.length}
-          <ul class="recent">
-            {#each app.settings.recentRepos as r (r)}
-              <li>
-                <button class="row" onclick={() => openRepo(r)} title={r}>
-                  <Icon name="folder" size={15} />
-                  <span class="name">{basename(r)}</span>
-                  <span class="path muted ellipsis">{r}</span>
-                </button>
-                <button class="btn ghost icon forget" title="Remove from list" onclick={() => forget(r)}>
-                  <Icon name="x" size={12} />
-                </button>
-              </li>
-            {/each}
-          </ul>
-        {:else}
-          <p class="muted">Repositories you open will show up here.</p>
-        {/if}
+      <section class="k-group-section">
+        <h2 class="k-group-header"><Icon name="folder" /> Recent</h2>
+        <div class="k-group">
+          {#each app.settings?.recentRepos ?? [] as r (r)}
+            <div class="recent">
+              <button class="row" onclick={() => openRepo(r)} title={r}>
+                <span class="name">{basename(r)}</span>
+                <span class="path mono ellipsis">{r}</span>
+              </button>
+              <button class="k-icon-btn forget" aria-label="Remove {basename(r)} from list" title="Remove from list" onclick={() => forget(r)}>
+                <Icon name="x" />
+              </button>
+            </div>
+          {:else}
+            <div class="k-group-row note">Repositories you open will show up here.</div>
+          {/each}
+        </div>
       </section>
 
-      <section class="accounts">
-        <div class="section-title">Accounts</div>
-        {#if app.settings?.accounts.length}
-          {#each app.settings.accounts as a (a.id)}
-            <div class="acct">
-              <ProviderLogo provider={a.provider} />
-              <span class="ellipsis">{a.displayName || a.username}</span>
-              <span class="muted ellipsis">{a.host}</span>
+      <section class="k-group-section">
+        <h2 class="k-group-header"><Icon name="user" /> Accounts</h2>
+        <div class="k-group">
+          {#each app.settings?.accounts ?? [] as a (a.id)}
+            <div class="k-group-row acct">
+              <ProviderLogo provider={a.provider} size={20} />
+              <span class="label">
+                <span class="ellipsis">{a.displayName || a.username}</span>
+                <span class="desc ellipsis">{a.host}</span>
+              </span>
             </div>
+          {:else}
+            <div class="k-group-row note">Sign in to clone your repositories and push over HTTPS without passwords.</div>
           {/each}
-        {:else}
-          <p class="muted">Sign in to clone your repositories and push over HTTPS without passwords.</p>
-        {/if}
-        <button class="btn small" onclick={() => (app.view = "settings")}>
-          <Icon name="user" size={13} /> Manage accounts
-        </button>
+        </div>
+        <p class="k-group-footer">
+          <button class="k-link" onclick={() => (app.view = "settings")}>Manage accounts…</button>
+        </p>
       </section>
     </div>
   </div>
@@ -108,101 +113,120 @@
     overflow: auto;
     display: flex;
     justify-content: center;
-    padding: 48px 24px;
+    padding: var(--space-48) var(--space-24);
+    background: var(--bg);
   }
   .inner {
     width: min(860px, 100%);
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: var(--space-32);
   }
   .brand {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: var(--space-16);
   }
   h1 {
-    margin: 0;
-    font-size: 24px;
-    letter-spacing: -0.01em;
+    font-size: 28px;
+    line-height: 34px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
   .brand p {
-    margin: 0;
+    color: var(--text-2);
   }
   .actions {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 12px;
+    gap: var(--space-12);
   }
   .card {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 18px;
+    align-items: center;
+    gap: var(--space-12);
+    padding: var(--space-16);
     text-align: left;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    transition:
-      border-color 0.12s,
-      transform 0.12s;
+    color: var(--text);
+    background: var(--surface);
+    border: 0;
+    border-radius: var(--radius-md);
+    transition: background-color 120ms ease;
+  }
+  :global([data-theme="dark"]) .card {
+    box-shadow: 0 0 0 1px var(--border);
   }
   .card:hover {
-    border-color: var(--accent);
-    transform: translateY(-1px);
+    background: var(--surface-hover);
   }
-  .card :global(svg) {
-    color: var(--accent);
-    margin-bottom: 4px;
+  .card:active {
+    opacity: 0.8;
   }
-  .card strong {
-    font-size: 15px;
+  .art {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-2);
+    color: var(--accent-text);
+  }
+  .card:hover .art {
+    background: var(--surface);
+  }
+  .what {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .what strong {
+    font-weight: 600;
+  }
+  .desc {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-3);
   }
   .columns {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: 28px;
+    gap: var(--space-24);
+    align-items: start;
   }
   @media (max-width: 760px) {
     .columns {
       grid-template-columns: 1fr;
     }
   }
-  section {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
+  .k-group-section + .k-group-section {
+    margin-top: 0;
   }
-  section p {
-    margin: 0;
+  .k-group {
+    overflow: hidden;
   }
   .recent {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-  .recent li {
     display: flex;
     align-items: center;
-    border-radius: 6px;
+    padding-right: var(--space-8);
   }
-  .recent li:hover {
-    background: var(--hover);
+  .recent + .recent {
+    border-top: 1px solid var(--border);
+  }
+  .recent:hover {
+    background: var(--surface-hover);
   }
   .row {
     flex: 1;
     display: flex;
-    align-items: center;
-    gap: 10px;
+    align-items: baseline;
+    gap: var(--space-12);
     min-width: 0;
-    padding: 7px 10px;
+    min-height: 44px;
+    padding: var(--space-12) var(--space-16);
     border: 0;
     background: none;
+    color: var(--text);
     text-align: left;
   }
   .name {
@@ -210,22 +234,19 @@
     flex-shrink: 0;
   }
   .path {
-    font-size: 12px;
+    color: var(--text-3);
   }
   .forget {
-    opacity: 0;
-    margin-right: 4px;
+    visibility: hidden;
   }
-  .recent li:hover .forget {
-    opacity: 0.7;
+  .recent:hover .forget,
+  .forget:focus-visible {
+    visibility: visible;
   }
-  .acct {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+  .note {
+    color: var(--text-3);
+  }
+  .acct .label {
     min-width: 0;
-  }
-  .accounts .btn {
-    align-self: flex-start;
   }
 </style>

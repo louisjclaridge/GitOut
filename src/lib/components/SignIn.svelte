@@ -85,29 +85,42 @@
   }
 </script>
 
-<div class="backdrop" role="presentation" onmousedown={(e) => e.target === e.currentTarget && cancel()}>
-  <div class="dialog" role="dialog" aria-modal="true" tabindex="-1" onkeydown={(e) => e.key === "Escape" && cancel()}>
+<div class="k-scrim" role="presentation" onmousedown={(e) => e.target === e.currentTarget && cancel()}>
+  <div
+    class="k-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="signin-title"
+    tabindex="-1"
+    onkeydown={(e) => e.key === "Escape" && cancel()}
+  >
     <header>
-      <ProviderLogo {provider} size={22} />
-      <h3>Sign in to {NAMES[provider]}</h3>
-      <button class="btn ghost icon" aria-label="Close" onclick={cancel}><Icon name="x" /></button>
+      <ProviderLogo {provider} size={24} />
+      <h2 id="signin-title">Sign in to {NAMES[provider]}</h2>
+      <button class="k-icon-btn" aria-label="Close" title="Close" onclick={cancel}><Icon name="x" /></button>
     </header>
 
     {#if provider !== "bitbucket" && !device}
-      <div class="seg">
-        <button class:active={method === "browser"} onclick={() => (method = "browser")}>Browser</button>
-        <button class:active={method === "token"} onclick={() => (method = "token")}>Access token</button>
+      <div class="k-tabs fill" role="tablist" aria-label="Sign-in method">
+        <button class="k-tab" role="tab" aria-selected={method === "browser"} onclick={() => (method = "browser")}>Browser</button>
+        <button class="k-tab" role="tab" aria-selected={method === "token"} onclick={() => (method = "token")}>Access token</button>
       </div>
     {/if}
 
     {#if provider !== "bitbucket" && !device}
       {#if showHost}
-        <label class="field">
-          <span>Server (leave empty for {provider === "github" ? "github.com" : "gitlab.com"})</span>
-          <input bind:value={host} placeholder={provider === "github" ? "github.mycompany.com" : "gitlab.mycompany.com"} spellcheck="false" />
+        <label class="k-field">
+          <span class="label">Server</span>
+          <input
+            class="k-input mono"
+            bind:value={host}
+            placeholder={provider === "github" ? "github.mycompany.com" : "gitlab.mycompany.com"}
+            spellcheck="false"
+          />
+          <span class="hint">Leave empty for {provider === "github" ? "github.com" : "gitlab.com"}.</span>
         </label>
       {:else}
-        <button class="link" onclick={() => (showHost = true)}>Using a self-hosted server?</button>
+        <button class="k-link small" onclick={() => (showHost = true)}>Using a self-hosted server?</button>
       {/if}
     {/if}
 
@@ -115,168 +128,102 @@
       {#if device}
         <div class="device">
           <p>Enter this code in the browser window that just opened:</p>
-          <button class="code mono" title="Copy code" onclick={copyCode}>{device.userCode} <Icon name="copy" size={16} /></button>
-          <button class="btn small" onclick={() => device && openUrl(device.verificationUriComplete ?? device.verificationUri)}>
-            <Icon name="external" size={13} /> Open {device.verificationUri.replace(/^https?:\/\//, "")}
+          <button class="code mono" title="Copy code" onclick={copyCode}>{device.userCode} <Icon name="copy" size={20} /></button>
+          <button class="k-btn" onclick={() => device && openUrl(device.verificationUriComplete ?? device.verificationUri)}>
+            <Icon name="external" /> Open {device.verificationUri.replace(/^https?:\/\//, "")}
           </button>
-          <p class="waiting muted"><span class="spinner"></span> Waiting for you to approve…</p>
+          <p class="waiting"><span class="k-spinner"></span> Waiting for you to approve…</p>
         </div>
       {:else}
-        <p class="muted">
-          You'll get a short code to enter on {NAMES[provider]}. GitOut never sees your password.
-        </p>
-        <button class="btn primary big" disabled={busy} onclick={startBrowser}>
-          <Icon name="external" size={15} /> Continue in browser
+        <p>You'll get a short code to enter on {NAMES[provider]}. GitOut never sees your password.</p>
+        <button class="k-btn primary block" disabled={busy} onclick={startBrowser}>
+          {#if busy}<span class="k-spinner"></span>{:else}<Icon name="external" />{/if} Continue in browser
         </button>
       {/if}
     {:else}
       <form onsubmit={submitToken}>
-        <p class="muted">
+        <p>
           {TOKEN_HELP[provider].text}
-          <button type="button" class="link" onclick={() => openUrl(TOKEN_HELP[provider].url)}>Create one →</button>
+          <button type="button" class="k-link" onclick={() => openUrl(TOKEN_HELP[provider].url)}>Create one</button>
         </p>
         {#if provider === "bitbucket"}
-          <label class="field">
-            <span>Atlassian account email</span>
-            <input bind:value={login} type="email" placeholder="you@example.com" spellcheck="false" />
+          <label class="k-field">
+            <span class="label">Atlassian account email</span>
+            <input class="k-input" bind:value={login} type="email" placeholder="you@example.com" spellcheck="false" />
           </label>
         {/if}
-        <label class="field">
-          <span>{provider === "bitbucket" ? "API token" : "Personal access token"}</span>
-          <input bind:value={token} type="password" spellcheck="false" autocomplete="off" />
+        <label class="k-field">
+          <span class="label">{provider === "bitbucket" ? "API token" : "Personal access token"}</span>
+          <input class="k-input mono" bind:value={token} type="password" spellcheck="false" autocomplete="off" />
         </label>
-        <button class="btn primary big" type="submit" disabled={busy || !token.trim() || (provider === "bitbucket" && !login.trim())}>
-          {busy ? "Checking…" : "Sign in"}
+        <button class="k-btn primary block" type="submit" disabled={busy || !token.trim() || (provider === "bitbucket" && !login.trim())}>
+          {#if busy}<span class="k-spinner"></span> Checking…{:else}Sign in{/if}
         </button>
       </form>
     {/if}
 
-    {#if error}<div class="error selectable">{error}</div>{/if}
+    {#if error}
+      <div class="k-banner danger" role="alert">
+        <Icon name="error" size={20} />
+        <div class="body"><div class="desc selectable">{error}</div></div>
+      </div>
+    {/if}
   </div>
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 800;
-    display: grid;
-    place-items: center;
-    background: rgba(0, 0, 0, 0.45);
-  }
-  .dialog {
-    width: min(440px, calc(100vw - 32px));
-    padding: 18px 20px 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
-  }
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-12);
+    margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-8)) 0 0;
   }
-  h3 {
+  h2 {
     flex: 1;
-    margin: 0;
-    font-size: 15px;
   }
   p {
-    margin: 0;
-  }
-  .seg {
-    display: flex;
-    padding: 3px;
-    border-radius: 8px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-  }
-  .seg button {
-    flex: 1;
-    padding: 6px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--muted);
-  }
-  .seg button.active {
-    background: var(--panel-2);
-    color: var(--text);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    color: var(--text-2);
   }
   form {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-12);
   }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .field span {
+  .small {
     font-size: 12px;
-    color: var(--muted);
-  }
-  .link {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: var(--accent);
-    text-align: left;
-    font-size: 12px;
-  }
-  .big {
-    padding: 9px;
-    font-weight: 600;
   }
   .device {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-12);
     text-align: center;
   }
   .code {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 18px;
+    gap: var(--space-12);
+    padding: var(--space-12) var(--space-20);
     font-size: 26px;
+    line-height: 32px;
     font-weight: 700;
     letter-spacing: 0.12em;
-    border: 1px dashed var(--accent);
-    border-radius: 10px;
+    border: 0;
+    border-radius: var(--radius-md);
     background: var(--accent-soft);
     color: var(--text);
+    user-select: text;
+  }
+  .code :global(.k-icon) {
+    color: var(--accent-text);
   }
   .waiting {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
+    color: var(--text-3);
   }
-  .spinner {
-    width: 12px;
-    height: 12px;
-    border: 2px solid var(--accent);
-    border-right-color: transparent;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-  .error {
-    padding: 8px 10px;
-    border-radius: 6px;
-    background: var(--del-bg);
-    color: var(--del-fg);
+  .k-banner .desc {
     white-space: pre-wrap;
   }
 </style>

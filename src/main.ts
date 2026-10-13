@@ -1,4 +1,6 @@
 import { mount } from "svelte";
+import "./keel/tokens.css";
+import "./keel/components.css";
 import "./app.css";
 import App from "./App.svelte";
 

@@ -25,13 +25,6 @@ export function initials(name: string): string {
   return ((parts[0][0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
 }
 
-/** Stable hue derived from a string, for avatar backgrounds. */
-export function hue(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return h % 360;
-}
-
 export function basename(p: string): string {
   return p.split(/[\\/]/).filter(Boolean).pop() ?? p;
 }

@@ -68,47 +68,47 @@
 
 <div class="diffview">
   <header>
-    <button class="btn ghost icon" title="Back to history (Esc)" onclick={() => (store.diff = null)}>
-      <Icon name="x" size={16} />
+    <button class="k-icon-btn" aria-label="Back to history" title="Back to history (Esc)" onclick={() => (store.diff = null)}>
+      <Icon name="back" />
     </button>
     <div class="title">
-      <strong class="ellipsis mono">{target.file}</strong>
-      {#if target.orig}<span class="muted ellipsis mono">renamed from {target.orig}</span>{/if}
+      <strong class="ellipsis mono selectable">{target.file}</strong>
+      {#if target.orig}<span class="ellipsis mono">Renamed from {target.orig}</span>{/if}
     </div>
-    <span class="mode">{MODE_LABEL[target.mode]}</span>
+    {#if MODE_LABEL[target.mode]}<span class="k-badge">{MODE_LABEL[target.mode]}</span>{/if}
     {#if target.mode === "untracked" || (target.mode === "unstaged" && fileStatus?.conflicted)}
-      <button class="btn small primary" onclick={() => runOk(() => api.stage(store.path, [target.file]))}>
+      <button class="k-btn tinted" onclick={() => runOk(() => api.stage(store.path, [target.file]))}>
         {fileStatus?.conflicted ? "Mark resolved" : "Stage file"}
       </button>
     {:else if target.mode === "unstaged"}
-      <button class="btn small primary" onclick={() => runOk(() => api.stage(store.path, [target.file]))}>Stage file</button>
+      <button class="k-btn tinted" onclick={() => runOk(() => api.stage(store.path, [target.file]))}>Stage file</button>
     {:else if target.mode === "staged"}
-      <button class="btn small" onclick={() => runOk(() => api.unstage(store.path, [target.file]))}>Unstage file</button>
+      <button class="k-btn" onclick={() => runOk(() => api.unstage(store.path, [target.file]))}>Unstage file</button>
     {/if}
   </header>
 
   <div class="content mono">
     {#if error}
-      <div class="empty">{error}</div>
+      <div class="empty-note selectable">{error}</div>
     {:else if !diff}
-      <div class="empty">Loading…</div>
+      <div class="empty-note"><span class="k-spinner" role="status" aria-label="Loading diff"></span></div>
     {:else if diff.binary}
-      <div class="empty">Binary file — no text diff to show.</div>
+      <div class="empty-note">Binary file. There's no text diff to show.</div>
     {:else if !diff.hunks.length}
-      <div class="empty">
+      <div class="empty-note">
         {fileStatus && target.mode !== "commit" ? `${STATUS_LABEL[fileStatus.worktree] ?? "No"} changes to show` : "No changes to show"}
         {#if diff.header.some((l) => l.startsWith("old mode"))}(file mode changed){/if}
       </div>
     {:else}
       {#each visibleHunks as h, hi (hi)}
         <div class="hunk-head">
-          <span class="muted">{h.header}</span>
+          <span class="hunk-range">{h.header}</span>
           <span class="hunk-actions">
             {#if target.mode === "unstaged"}
-              <button class="btn small ghost" onclick={() => discardHunk(h)}><Icon name="undo" size={12} /> Discard hunk</button>
-              <button class="btn small" onclick={() => apply(h, true, false)}><Icon name="plus" size={12} /> Stage hunk</button>
+              <button class="k-btn ghost" onclick={() => discardHunk(h)}><Icon name="undo" /> Discard hunk…</button>
+              <button class="k-btn" onclick={() => apply(h, true, false)}><Icon name="plus" /> Stage hunk</button>
             {:else if target.mode === "staged"}
-              <button class="btn small" onclick={() => apply(h, true, true)}><Icon name="minus" size={12} /> Unstage hunk</button>
+              <button class="k-btn" onclick={() => apply(h, true, true)}><Icon name="minus" /> Unstage hunk</button>
             {/if}
           </span>
         </div>
@@ -126,9 +126,9 @@
         </table>
       {/each}
       {#if truncated}
-        <div class="empty">
+        <div class="empty-note more">
           Showing the first {MAX_LINES.toLocaleString()} of {lineCount.toLocaleString()} lines.
-          <button class="btn small" onclick={() => (showAll = true)}>Show everything</button>
+          <button class="k-btn" onclick={() => (showAll = true)}>Show everything</button>
         </div>
       {/if}
     {/if}
@@ -145,10 +145,11 @@
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 6px 12px 6px 6px;
+    gap: var(--space-8);
+    min-height: 48px;
+    padding: var(--space-6) var(--space-8);
     border-bottom: 1px solid var(--border);
-    background: var(--panel);
+    background: var(--surface);
   }
   .title {
     flex: 1;
@@ -156,17 +157,19 @@
     display: flex;
     flex-direction: column;
   }
+  .title strong {
+    font-weight: 600;
+  }
   .title span {
     font-size: 11px;
-  }
-  .mode {
-    color: var(--muted);
-    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-3);
   }
   .content {
     flex: 1;
     overflow: auto;
-    padding-bottom: 24px;
+    padding-bottom: var(--space-24);
+    line-height: 20px;
   }
   .hunk-head {
     position: sticky;
@@ -174,23 +177,32 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 4px 10px;
-    margin-top: 10px;
-    background: var(--panel-2);
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    font-size: 11.5px;
+    gap: var(--space-12);
+    min-height: 40px;
+    padding: var(--space-4) var(--space-8) var(--space-4) var(--space-12);
+    margin-top: var(--space-12);
+    background: var(--surface-2);
+    font-size: 12px;
+  }
+  .hunk-range {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-3);
+  }
+  .hunk-actions {
+    flex: none;
   }
   .hunk-actions {
     display: flex;
-    gap: 4px;
-    font-family: Inter, system-ui, sans-serif;
+    gap: var(--space-4);
+    font-family: var(--font-sans);
+    font-size: 13px;
   }
   table {
     border-collapse: collapse;
     width: 100%;
-    line-height: 20px;
   }
   td {
     padding: 0;
@@ -199,39 +211,49 @@
   .ln {
     width: 1%;
     min-width: 44px;
-    padding: 0 8px;
+    padding: 0 var(--space-8);
     text-align: right;
-    color: var(--faint);
+    color: var(--text-3);
     user-select: none;
     white-space: nowrap;
   }
   .sign {
     width: 16px;
     text-align: center;
-    color: var(--faint);
+    color: var(--text-3);
     user-select: none;
   }
   .code {
     white-space: pre;
-    padding-right: 16px;
+    padding-right: var(--space-16);
     tab-size: 4;
   }
   tr.add {
-    background: var(--add-bg);
+    background: var(--success-soft);
   }
-  tr.add .code,
   tr.add .sign {
-    color: var(--add-fg);
+    color: var(--success);
+    font-weight: 600;
   }
   tr.del {
-    background: var(--del-bg);
+    background: var(--danger-soft);
   }
-  tr.del .code,
   tr.del .sign {
-    color: var(--del-fg);
+    color: var(--danger);
+    font-weight: 600;
   }
   tr.meta .code {
-    color: var(--faint);
+    color: var(--text-3);
     font-style: italic;
+  }
+  .more {
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-12);
+  }
+  .empty-note .k-spinner {
+    display: inline-block;
   }
 </style>

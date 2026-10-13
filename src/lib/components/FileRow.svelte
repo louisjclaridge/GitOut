@@ -33,7 +33,7 @@
   {oncontextmenu}
   onkeydown={(e) => e.key === "Enter" && onclick()}
 >
-  <span class="st st-{status === '?' ? 'N' : status}" title={STATUS_LABEL[status] ?? status}>{status === "?" ? "+" : status}</span>
+  <span class="st st-{status === '?' ? 'N' : status}" title={STATUS_LABEL[status] ?? status} aria-label={STATUS_LABEL[status] ?? status}>{status === "?" ? "+" : status}</span>
   <span class="name">{name}</span>
   <span class="dir ellipsis">{dir}</span>
   {#if actions}<span class="actions">{@render actions()}</span>{/if}
@@ -43,43 +43,48 @@
   .file {
     display: flex;
     align-items: center;
-    gap: 8px;
-    height: 28px;
-    padding: 0 6px 0 12px;
+    gap: var(--space-8);
+    height: var(--control-md);
+    margin: 0 var(--space-8);
+    padding: 0 var(--space-2) 0 var(--space-8);
+    border-radius: var(--radius-sm);
     min-width: 0;
     cursor: pointer;
   }
   .file:hover {
-    background: var(--hover);
+    background: var(--surface-hover);
   }
   .file.selected {
-    background: var(--selected);
+    background: var(--accent-soft);
   }
+  /* Status letter as a toned chip: word in the tooltip, letter and colour together. */
   .st {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 700;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-xs);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    color: #fff;
-    background: var(--warn);
+    background: var(--warning-soft);
+    color: var(--warning);
   }
   .st-A,
   .st-N {
-    background: var(--ok);
+    background: var(--success-soft);
+    color: var(--success);
   }
-  .st-D {
-    background: var(--danger);
+  .st-D,
+  .st-U {
+    background: var(--danger-soft);
+    color: var(--danger);
   }
   .st-R,
   .st-C {
-    background: var(--lane-4);
-  }
-  .st-U {
-    background: var(--danger);
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
   .name {
     white-space: nowrap;
@@ -90,16 +95,17 @@
   }
   .dir {
     flex: 1;
-    color: var(--faint);
+    color: var(--text-3);
     font-size: 12px;
     direction: rtl;
     text-align: left;
   }
   .actions {
     display: none;
-    gap: 2px;
+    gap: var(--space-2);
   }
-  .file:hover .actions {
+  .file:hover .actions,
+  .file:focus-within .actions {
     display: flex;
   }
 </style>

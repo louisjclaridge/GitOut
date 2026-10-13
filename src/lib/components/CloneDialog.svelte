@@ -77,242 +77,208 @@
 
 <svelte:window onkeydown={(e) => e.key === "Escape" && onclose()} />
 
-<div class="backdrop" role="presentation" onmousedown={(e) => e.target === e.currentTarget && onclose()}>
-  <form class="panel" onsubmit={clone}>
-    <header>
-      <h3>Clone a repository</h3>
-      <button type="button" class="btn ghost icon" aria-label="Close" onclick={onclose}><Icon name="x" /></button>
-    </header>
+<div class="k-scrim" role="presentation" onmousedown={(e) => e.target === e.currentTarget && onclose()}>
+  <div class="k-dialog clone" role="dialog" aria-modal="true" aria-labelledby="clone-title">
+    <form onsubmit={clone}>
+      <header>
+        <h2 id="clone-title">Clone a repository</h2>
+        <button type="button" class="k-icon-btn" aria-label="Close" title="Close" onclick={onclose}><Icon name="x" /></button>
+      </header>
 
-    <div class="body">
-      <nav class="sources">
-        <button type="button" class:active={source === "url"} onclick={() => selectSource("url")}>
-          <Icon name="external" size={14} /> URL
-        </button>
-        {#each app.settings?.accounts ?? [] as a (a.id)}
-          <button type="button" class:active={source === a.id} onclick={() => selectSource(a.id)}>
-            <ProviderLogo provider={a.provider} size={14} />
-            <span class="ellipsis">{a.username}</span>
+      <div class="cols">
+        <nav class="sources k-list" aria-label="Source">
+          <button type="button" class="k-item" aria-current={source === "url" ? "true" : undefined} onclick={() => selectSource("url")}>
+            <Icon name="external" />
+            <span class="name">URL</span>
           </button>
-        {/each}
-        {#if !app.settings?.accounts.length}
-          <button
-            type="button"
-            class="signin"
-            onclick={() => {
-              onclose();
-              app.view = "settings";
-            }}>+ Sign in to see your repos</button
-          >
-        {/if}
-      </nav>
+          {#each app.settings?.accounts ?? [] as a (a.id)}
+            <button type="button" class="k-item" aria-current={source === a.id ? "true" : undefined} onclick={() => selectSource(a.id)}>
+              <ProviderLogo provider={a.provider} />
+              <span class="name">{a.username}</span>
+            </button>
+          {/each}
+          {#if !app.settings?.accounts.length}
+            <button
+              type="button"
+              class="k-link signin"
+              onclick={() => {
+                onclose();
+                app.view = "settings";
+              }}>Sign in to see your repositories…</button
+            >
+          {/if}
+        </nav>
 
-      <div class="main">
-        {#if source !== "url"}
-          <div class="list-head">
-            <input placeholder="Filter repositories…" bind:value={filter} spellcheck="false" />
-            <label class="ssh"><input type="checkbox" bind:checked={useSsh} /> SSH</label>
-          </div>
-          <div class="list">
-            {#if loadingRepos}
-              <div class="empty">Loading repositories…</div>
-            {:else if repoError}
-              <div class="empty error">{repoError}</div>
-            {:else if !filtered.length}
-              <div class="empty">No repositories found.</div>
-            {/if}
-            {#each filtered as r (r.fullName)}
-              <button
-                type="button"
-                class="repo"
-                class:sel={url === r.httpsUrl || url === r.sshUrl}
-                onclick={() => pick(r)}
-                ondblclick={(e) => {
-                  pick(r);
-                  void clone(e);
-                }}
-              >
-                <span class="ellipsis"><strong>{r.fullName}</strong></span>
-                {#if r.private}<span class="badge">private</span>{/if}
-                {#if r.description}<span class="desc muted ellipsis">{r.description}</span>{/if}
-              </button>
-            {/each}
-          </div>
-        {/if}
+        <div class="main">
+          {#if source !== "url"}
+            <div class="list-head">
+              <div class="k-search">
+                <Icon name="search" size={14} />
+                <input class="k-input" placeholder="Filter repositories" aria-label="Filter repositories" bind:value={filter} spellcheck="false" />
+              </div>
+              <label class="k-check"><input type="checkbox" bind:checked={useSsh} /><span>Use SSH</span></label>
+            </div>
+            <div class="list">
+              {#if loadingRepos}
+                <div class="empty-note loading"><span class="k-spinner"></span> Loading repositories…</div>
+              {:else if repoError}
+                <div class="k-banner danger" role="alert">
+                  <Icon name="error" size={20} />
+                  <div class="body"><div class="desc selectable">{repoError}</div></div>
+                </div>
+              {:else if !filtered.length}
+                <div class="empty-note">{filter ? `No repositories match “${filter}”.` : "No repositories found."}</div>
+              {/if}
+              {#each filtered as r (r.fullName)}
+                <button
+                  type="button"
+                  class="repo"
+                  class:selected={url === r.httpsUrl || url === r.sshUrl}
+                  onclick={() => pick(r)}
+                  ondblclick={(e) => {
+                    pick(r);
+                    void clone(e);
+                  }}
+                >
+                  <span class="repo-name ellipsis">{r.fullName}</span>
+                  {#if r.private}<span class="k-badge">Private</span>{/if}
+                  {#if r.description}<span class="repo-desc ellipsis">{r.description}</span>{/if}
+                </button>
+              {/each}
+            </div>
+          {/if}
 
-        <label class="field">
-          <span>Repository URL</span>
-          <input bind:value={url} placeholder="https://github.com/owner/repo.git" spellcheck="false" />
-        </label>
-        <div class="row">
-          <label class="field grow">
-            <span>Clone into</span>
-            <input bind:value={parent} spellcheck="false" />
+          <label class="k-field">
+            <span class="label">Repository URL</span>
+            <input class="k-input mono" bind:value={url} placeholder="https://github.com/owner/repo.git" spellcheck="false" />
           </label>
-          <button type="button" class="btn" onclick={browse}>Browse…</button>
+          <div class="row">
+            <label class="k-field grow">
+              <span class="label">Clone into</span>
+              <input class="k-input mono" bind:value={parent} spellcheck="false" />
+            </label>
+            <button type="button" class="k-btn" onclick={browse}>Browse…</button>
+          </div>
+          <label class="k-field">
+            <span class="label">Folder name</span>
+            <input class="k-input mono" bind:value={name} oninput={() => (nameTouched = true)} spellcheck="false" />
+          </label>
         </div>
-        <label class="field">
-          <span>Folder name</span>
-          <input bind:value={name} oninput={() => (nameTouched = true)} spellcheck="false" />
-        </label>
       </div>
-    </div>
 
-    <footer>
-      <button type="button" class="btn" onclick={onclose}>Cancel</button>
-      <button type="submit" class="btn primary" disabled={!url.trim() || !parent.trim() || !name.trim()}>
-        Clone
-      </button>
-    </footer>
-  </form>
+      <footer class="actions">
+        <button type="button" class="k-btn ghost" onclick={onclose}>Cancel</button>
+        <button type="submit" class="k-btn primary" disabled={!url.trim() || !parent.trim() || !name.trim()}>Clone</button>
+      </footer>
+    </form>
+  </div>
 </div>
 
 <style>
-  .backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 800;
-    display: grid;
-    place-items: center;
-    background: rgba(0, 0, 0, 0.45);
+  /* A two-column form, so wider than Keel's default dialog. */
+  .clone {
+    width: min(760px, 100%);
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
   }
-  .panel {
-    width: min(760px, calc(100vw - 32px));
-    max-height: calc(100vh - 64px);
-    display: flex;
-    flex-direction: column;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: var(--shadow);
+  form {
+    display: contents;
   }
-  header,
-  footer {
+  header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-  }
-  header {
+    padding: var(--space-12) var(--space-12) var(--space-12) var(--space-20);
     border-bottom: 1px solid var(--border);
   }
-  footer {
-    justify-content: flex-end;
-    gap: 8px;
-    border-top: 1px solid var(--border);
-  }
-  h3 {
-    margin: 0;
-    font-size: 15px;
-  }
-  .body {
+  .cols {
     display: grid;
-    grid-template-columns: 180px 1fr;
+    grid-template-columns: 188px 1fr;
     min-height: 0;
     flex: 1;
   }
   .sources {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 10px;
+    padding: var(--space-12) var(--space-8);
+    background: var(--bg);
     border-right: 1px solid var(--border);
   }
-  .sources button {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 10px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    text-align: left;
-    min-width: 0;
-  }
-  .sources button:hover {
-    background: var(--hover);
-  }
-  .sources button.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .sources .signin {
-    color: var(--accent);
+  .signin {
+    padding: var(--space-6) var(--space-8);
     font-size: 12px;
   }
   .main {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    padding: 14px 16px;
+    gap: var(--space-12);
+    padding: var(--space-16) var(--space-20);
     min-width: 0;
     overflow: auto;
   }
   .list-head {
     display: flex;
-    gap: 10px;
+    gap: var(--space-12);
     align-items: center;
   }
-  .ssh {
-    display: flex;
-    gap: 5px;
-    align-items: center;
+  .list-head .k-search {
+    flex: 1;
+  }
+  .k-check {
     white-space: nowrap;
   }
   .list {
     height: 230px;
     overflow: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg);
+    padding: var(--space-4);
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-8);
   }
   .repo {
     display: grid;
     grid-template-columns: 1fr auto;
-    gap: 2px 8px;
+    align-items: center;
+    gap: 0 var(--space-8);
     width: 100%;
-    padding: 7px 10px;
+    min-height: var(--control-md);
+    padding: var(--space-6) var(--space-8);
     border: 0;
-    border-bottom: 1px solid var(--border);
+    border-radius: var(--radius-sm);
     background: none;
+    color: var(--text);
     text-align: left;
   }
   .repo:hover {
-    background: var(--hover);
+    background: var(--surface-hover);
   }
-  .repo.sel {
-    background: var(--selected);
+  .repo.selected {
+    background: var(--accent-soft);
   }
-  .desc {
+  .repo-name {
+    font-weight: 600;
+  }
+  .repo-desc {
     grid-column: 1 / -1;
     font-size: 12px;
-  }
-  .badge {
-    font-size: 10.5px;
-    padding: 0 6px;
-    border-radius: 9px;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    align-self: center;
-  }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-  .field span {
-    font-size: 12px;
-    color: var(--muted);
+    line-height: 16px;
+    color: var(--text-3);
   }
   .row {
     display: flex;
-    gap: 8px;
+    gap: var(--space-8);
     align-items: flex-end;
   }
   .grow {
     flex: 1;
   }
-  .error {
-    color: var(--danger);
+  .clone .actions {
+    margin: 0;
+    padding: var(--space-12) var(--space-20);
+    border-top: 1px solid var(--border);
   }
 </style>

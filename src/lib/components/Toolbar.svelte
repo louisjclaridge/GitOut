@@ -13,139 +13,131 @@
 
 <div class="toolbar">
   <div class="where">
-    <Icon name="branch" size={15} />
+    <Icon name="branch" />
     {#if st?.branch}
-      <strong class="ellipsis">{st.branch}</strong>
+      <strong class="ellipsis" title={st.branch}>{st.branch}</strong>
       {#if st.upstream}
-        <span class="muted ellipsis upstream">→ {st.upstream}</span>
+        <span class="upstream ellipsis" title="Tracking {st.upstream}">{st.upstream}</span>
       {:else if store.loaded}
-        <span class="muted">(not published)</span>
+        <span class="upstream">Not published</span>
       {/if}
     {:else if st}
-      <strong>detached HEAD</strong>
+      <strong>Detached HEAD</strong>
     {/if}
   </div>
 
   <div class="group">
-    <button class="tb" disabled={busy} title="Fetch from all remotes" onclick={() => store.fetch()}>
-      <Icon name="fetch" size={17} /><span>Fetch</span>
+    <button class="k-btn ghost" disabled={busy} title="Fetch from all remotes" onclick={() => store.fetch()}>
+      <Icon name="fetch" />Fetch
     </button>
-    <button class="tb" disabled={busy || !st?.upstream} title="Pull from {st?.upstream ?? 'upstream'}" onclick={() => store.pull()}>
-      <Icon name="pull" size={17} /><span>Pull</span>
-      {#if st?.behind}<em class="count">{st.behind}</em>{/if}
+    <button class="k-btn ghost" disabled={busy || !st?.upstream} title="Pull from {st?.upstream ?? 'upstream'}" onclick={() => store.pull()}>
+      <Icon name="pull" />Pull
+      {#if st?.behind}<span class="k-badge accent" title="{st.behind} to pull">{st.behind}</span>{/if}
     </button>
     <button
-      class="tb"
+      class="k-btn ghost"
       disabled={busy || !st?.branch}
       title={st?.upstream ? `Push to ${st.upstream}` : "Publish this branch"}
       onclick={() => store.push()}
       oncontextmenu={(e) =>
         showMenu(e, [{ label: "Force push (with lease)…", icon: "warning", danger: true, action: () => store.push(true) }])}
     >
-      <Icon name="push" size={17} /><span>{st?.upstream || !store.loaded ? "Push" : "Publish"}</span>
-      {#if st?.ahead}<em class="count">{st.ahead}</em>{/if}
+      <Icon name="push" />{st?.upstream || !store.loaded ? "Push" : "Publish"}
+      {#if st?.ahead}<span class="k-badge accent" title="{st.ahead} to push">{st.ahead}</span>{/if}
     </button>
   </div>
 
+  <span class="divider"></span>
+
   <div class="group">
-    <button class="tb" title="Create a branch" onclick={() => store.createBranch()}>
-      <Icon name="branch" size={17} /><span>Branch</span>
+    <button class="k-btn ghost" title="Create a branch" onclick={() => store.createBranch()}>
+      <Icon name="branch" />Branch
     </button>
-    <button class="tb" disabled={!store.dirty} title="Stash your uncommitted changes" onclick={() => store.stash()}>
-      <Icon name="stash" size={17} /><span>Stash</span>
+    <button class="k-btn ghost" disabled={!store.dirty} title="Stash your uncommitted changes" onclick={() => store.stash()}>
+      <Icon name="stash" />Stash
     </button>
     <button
-      class="tb"
+      class="k-btn ghost"
       disabled={!stashCount}
       title="Apply and remove the latest stash"
       onclick={() => store.popLatest()}
       oncontextmenu={(e) => store.stashes[0] && showMenu(e, store.stashMenu(store.stashes[0]))}
     >
-      <Icon name="pop" size={17} /><span>Pop</span>
-      {#if stashCount}<em class="count">{stashCount}</em>{/if}
+      <Icon name="pop" />Pop
+      {#if stashCount}<span class="k-badge" title="{stashCount} stashed">{stashCount}</span>{/if}
     </button>
   </div>
 
   <div class="spacer"></div>
 
-  <button class="tb" title="Open folder" onclick={() => store.openFolder()}>
-    <Icon name="folder" size={17} />
-  </button>
-  <button class="tb" title="Refresh (Ctrl+R)" onclick={() => store.load()}>
-    <Icon name="fetch" size={17} />
-  </button>
+  <div class="group">
+    <button class="k-icon-btn" aria-label="Open folder" title="Open folder" onclick={() => store.openFolder()}>
+      <Icon name="folder-open" />
+    </button>
+    <button class="k-icon-btn" aria-label="Refresh" title="Refresh (Ctrl+R)" onclick={() => store.load()}>
+      <Icon name="refresh" />
+    </button>
+  </div>
 </div>
 
 <style>
   .toolbar {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    height: 54px;
-    padding: 0 12px;
-    background: var(--panel);
+    gap: var(--space-8);
+    height: 48px;
+    padding: 0 var(--space-8) 0 var(--space-16);
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
+    overflow: hidden;
   }
   .where {
     display: flex;
     align-items: center;
-    gap: 7px;
-    width: 206px;
+    gap: var(--space-6);
+    width: 200px;
     min-width: 0;
     flex-shrink: 0;
+    color: var(--accent-text);
+  }
+  .where strong {
+    color: var(--text);
+    font-weight: 600;
+    flex-shrink: 1;
   }
   .upstream {
     font-size: 12px;
+    color: var(--text-3);
+    flex-shrink: 2;
   }
   .group {
     display: flex;
-    gap: 2px;
-    padding-left: 10px;
-    border-left: 1px solid var(--border);
+    gap: var(--space-4);
+  }
+  .divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex: none;
   }
   .spacer {
     flex: 1;
   }
-  .tb {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  .k-btn {
+    padding: 0 var(--space-8);
+  }
+  .k-btn .k-badge {
+    height: 18px;
+    min-width: 18px;
     justify-content: center;
-    gap: 2px;
-    min-width: 48px;
-    height: 44px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: 6px;
-    background: none;
-    color: var(--text);
-  }
-  .tb span {
+    padding: 0 5px;
     font-size: 11px;
-    color: var(--muted);
+    font-variant-numeric: tabular-nums;
   }
-  .tb:hover:not(:disabled) {
-    background: var(--hover);
-  }
-  .tb:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .count {
-    position: absolute;
-    top: 3px;
-    right: 6px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: 8px;
-    font-size: 10px;
-    font-style: normal;
-    font-weight: 600;
-    line-height: 16px;
-    text-align: center;
-    background: var(--accent);
-    color: var(--accent-text);
+  @media (max-width: 1100px) {
+    .where {
+      width: 168px;
+    }
   }
 </style>

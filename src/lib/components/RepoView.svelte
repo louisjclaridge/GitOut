@@ -59,31 +59,33 @@
   <Toolbar {store} />
 
   {#if store.status?.state}
-    <div class="banner">
-      <Icon name="warning" size={15} />
-      <span>
-        <strong>{STATE_LABEL[store.status.state]}.</strong>
-        {#if conflicts}
-          Resolve {conflicts} conflicted file{conflicts === 1 ? "" : "s"}, stage them, then continue.
-        {:else}
-          All conflicts resolved. You can continue.
-        {/if}
-      </span>
-      <button
-        class="btn small primary"
-        disabled={conflicts > 0}
-        onclick={() => run(() => api.operationContinue(repo), { done: "Continued" })}>Continue</button
-      >
-      <button
-        class="btn small"
-        onclick={async () =>
-          (await confirm("Abort?", "This undoes the operation and returns to where you were before it started.", "Abort", true)) &&
-          run(() => api.operationAbort(repo), { done: "Aborted" })}>Abort</button
-      >
+    <div class="notice">
+      <div class="k-banner warning">
+        <Icon name="warning" size={20} />
+        <div class="body">
+          <span class="title">{STATE_LABEL[store.status.state]}.</span>
+          {#if conflicts}
+            Resolve {conflicts} conflicted file{conflicts === 1 ? "" : "s"}, stage them, then continue.
+          {:else}
+            All conflicts are resolved. You can continue.
+          {/if}
+        </div>
+        <button
+          class="k-btn ghost"
+          onclick={async () =>
+            (await confirm("Abort the operation?", "This undoes the operation and returns to where you were before it started.", "Abort", true)) &&
+            run(() => api.operationAbort(repo), { done: "Aborted" })}>Abort…</button
+        >
+        <button
+          class="k-btn primary"
+          disabled={conflicts > 0}
+          onclick={() => run(() => api.operationContinue(repo), { done: "Continued" })}>Continue</button
+        >
+      </div>
     </div>
   {/if}
 
-  <div class="body">
+  <div class="columns">
     <Sidebar {store} />
     <div class="center">
       {#if store.diff}
@@ -100,7 +102,7 @@
           <CommitPanel {store} hash={store.selected.hash} />
         {/key}
       {:else if store.loaded}
-        <div class="empty">Select a commit to see its details.</div>
+        <div class="empty-note">Select a commit to see its details.</div>
       {/if}
     </aside>
   </div>
@@ -112,41 +114,39 @@
     flex-direction: column;
     height: 100%;
   }
-  .banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 7px 14px;
-    background: color-mix(in srgb, var(--warn) 14%, var(--panel));
+  .notice {
+    padding: 0 var(--space-8) var(--space-8);
+    background: var(--bg);
     border-bottom: 1px solid var(--border);
   }
-  .banner :global(svg) {
-    color: var(--warn);
+  .notice .k-banner {
+    padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
   }
-  .banner span {
-    flex: 1;
+  .notice .title {
+    margin-right: var(--space-4);
   }
-  .body {
+  .columns {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 230px minmax(0, 1fr) 360px;
+    grid-template-columns: 232px minmax(0, 1fr) 340px;
   }
   .center {
     min-width: 0;
     min-height: 0;
     display: flex;
     flex-direction: column;
+    background: var(--surface);
   }
   .details {
     min-height: 0;
     border-left: 1px solid var(--border);
-    background: var(--panel);
+    background: var(--surface);
     display: flex;
     flex-direction: column;
   }
   @media (max-width: 1100px) {
-    .body {
+    .columns {
       grid-template-columns: 200px minmax(0, 1fr) 300px;
     }
   }

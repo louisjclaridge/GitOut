@@ -1,0 +1,149 @@
+/* Keel — generated from tokens.json */
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("./fonts/InstrumentSans-Variable-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Instrument Sans";
+  src: url("./fonts/InstrumentSans-Variable-latin-ext.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("./fonts/JetBrainsMono-Variable-latin.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --radius-xs: 5px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 999px;
+  --control-md: 32px;
+  --control-lg: 40px;
+  --icon-sm: 14px;
+  --icon-md: 16px;
+  --icon-lg: 20px;
+  --titlebar-height: 40px;
+  --sidebar-width: 248px;
+  --rail-width: 56px;
+  --dialog-width: 460px;
+  --bp-compact: 640px;
+  --bp-expanded: 1024px;
+  --layer-titlebar: 100;
+  --layer-drawer: 800;
+  --layer-dialog: 900;
+  --layer-toast: 950;
+  --layer-menu: 1000;
+  --font-sans: "Instrument Sans", -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Ubuntu, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+}
+
+:root,
+[data-theme="light"] {
+  --bg: #f5f5f7;
+  --surface: #ffffff;
+  --surface-2: #f0f0f3;
+  --surface-hover: #e8e8ed;
+  --surface-raised: #ffffff;
+  --surface-glass: rgba(246, 246, 248, 0.82);
+  --surface-field: #f0f0f3;
+  --border: #dedee3;
+  --border-control: #8a8a8f;
+  --text: #1d1d1f;
+  --text-2: #424245;
+  --text-3: #68686d;
+  --accent: #0066cc;
+  --accent-hover: #0058b0;
+  --on-accent: #ffffff;
+  --accent-soft: #e5f0fc;
+  --accent-text: #0062c4;
+  --focus: var(--accent);
+  --success: #1d7a34;
+  --success-soft: #e4f4e8;
+  --warning: #a14a00;
+  --warning-soft: #fdf0dc;
+  --danger: #d70015;
+  --danger-hover: #b80012;
+  --on-danger: #ffffff;
+  --danger-soft: #fde8ea;
+  --scrim: rgba(0, 0, 0, 0.25);
+  --tag-1: #0066cc;
+  --tag-2: #1a7f37;
+  --tag-3: #c45500;
+  --tag-4: #d1244f;
+  --tag-5: #8e3fd1;
+  --tag-6: #0a7ea4;
+  --tag-7: #9a7400;
+  --tag-8: #6e6e73;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.20);
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --bg: #1c1c1e;
+  --surface: #242426;
+  --surface-2: #2f2f32;
+  --surface-hover: #3a3a3d;
+  --surface-raised: #505054;
+  --surface-glass: rgba(44, 44, 47, 0.82);
+  --surface-field: #2f2f32;
+  --border: #38383a;
+  --border-control: #7c7c81;
+  --text: #f5f5f7;
+  --text-2: #c7c7cc;
+  --text-3: #a6a6ab;
+  --accent: #0b74e5;
+  --accent-hover: #0a66cc;
+  --on-accent: #ffffff;
+  --accent-soft: #13304f;
+  --accent-text: #4da3ff;
+  --focus: var(--accent-text);
+  --success: #30d158;
+  --success-soft: #173a22;
+  --warning: #ff9f0a;
+  --warning-soft: #3a2a10;
+  --danger: #ff6961;
+  --danger-hover: #ff8580;
+  --on-danger: #2b0a0a;
+  --danger-soft: #3d1c1c;
+  --scrim: rgba(0, 0, 0, 0.50);
+  --tag-1: #0a84ff;
+  --tag-2: #30d158;
+  --tag-3: #ff9f0a;
+  --tag-4: #ff375f;
+  --tag-5: #bf5af2;
+  --tag-6: #64d2ff;
+  --tag-7: #ffd60a;
+  --tag-8: #98989d;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.40);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.60);
+  color-scheme: dark;
+}

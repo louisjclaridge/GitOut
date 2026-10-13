@@ -9,7 +9,7 @@
 
   let { store }: { store: RepoStore } = $props();
 
-  const ROW_H = 30;
+  const ROW_H = 32;
   const LANE_W = 14;
   const MAX_LANES_SHOWN = 12;
   const OVERSCAN = 10;
@@ -122,8 +122,17 @@
 
 <div class="graph">
   <form class="search" onsubmit={findNext}>
-    <Icon name="search" size={13} />
-    <input placeholder="Find commit by message, author or hash — Enter for next" bind:value={search} spellcheck="false" />
+    <div class="k-search">
+      <Icon name="search" size={14} />
+      <input
+        class="k-input"
+        placeholder="Find a commit by message, author or hash"
+        aria-label="Find a commit"
+        title="Enter jumps to the next match"
+        bind:value={search}
+        spellcheck="false"
+      />
+    </div>
   </form>
 
   <div
@@ -183,27 +192,26 @@
               <svg width={graphW} height={ROW_H} class="lanes">
                 {#each row.segments as s, si (si)}
                   {#if s.x1 < lanesShown && s.x2 < lanesShown}
-                    <path d={segmentPath(s, LANE_W, ROW_H)} style="stroke:var(--lane-{s.color})" />
+                    <path d={segmentPath(s, LANE_W, ROW_H)} style="stroke:var(--tag-{s.color + 1})" />
                   {/if}
                 {/each}
                 {#if row.col < lanesShown}
                   {@const cx = row.col * LANE_W + LANE_W / 2}
                   {#if c.hash === store.headHash}
-                    <circle {cx} cy={ROW_H / 2} r="7" class="head-ring" style="stroke:var(--lane-{row.color})" />
+                    <circle {cx} cy={ROW_H / 2} r="7" class="head-ring" style="stroke:var(--tag-{row.color + 1})" />
                   {/if}
                   {#if c.parents.length > 1}
-                    <circle {cx} cy={ROW_H / 2} r="4" class="merge" style="stroke:var(--lane-{row.color})" />
+                    <circle {cx} cy={ROW_H / 2} r="4" class="merge" style="stroke:var(--tag-{row.color + 1})" />
                   {:else}
-                    <circle {cx} cy={ROW_H / 2} r="4.5" style="fill:var(--lane-{row.color})" />
+                    <circle {cx} cy={ROW_H / 2} r="4.5" style="fill:var(--tag-{row.color + 1})" />
                   {/if}
                 {/if}
               </svg>
               <span class="msg">
                 {#each pills(c) as p (p.kind + p.label)}
                   <button
-                    class="ref-pill"
-                    class:current={p.current}
-                    style="--c:var(--lane-{row.color})"
+                    class="k-badge ref"
+                    class:accent={p.current}
                     title={p.label}
                     onclick={(e) => {
                       e.stopPropagation();
@@ -219,10 +227,15 @@
                       if (r) showMenu(e, store.refMenu(r));
                     }}
                   >
-                    {#if p.current}<Icon name="check" size={11} stroke={2.6} />{/if}
-                    {#if p.kind === "tag"}<Icon name="tag" size={11} />{/if}
+                    {#if p.current}
+                      <Icon name="check" size={12} stroke={2.5} />
+                    {:else if p.kind === "tag"}
+                      <Icon name="tag" size={12} />
+                    {:else}
+                      <span class="dot" style="background:var(--tag-{row.color + 1})"></span>
+                    {/if}
                     <span class="ellipsis">{p.label}</span>
-                    {#if p.remote}<Icon name="cloud" size={11} />{/if}
+                    {#if p.remote}<Icon name="cloud" size={12} />{/if}
                   </button>
                 {/each}
                 <span class="subject ellipsis">{c.subject}</span>
@@ -236,7 +249,7 @@
       {/each}
     </div>
     {#if store.loaded && total === 0}
-      <div class="empty">No commits yet. Make your first commit from the panel on the right.</div>
+      <div class="empty-note">No commits yet. Make your first commit from the panel on the right.</div>
     {/if}
   </div>
 </div>
@@ -249,18 +262,8 @@
     flex: 1;
   }
   .search {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 0 12px;
-    color: var(--muted);
+    padding: var(--space-8);
     border-bottom: 1px solid var(--border);
-  }
-  .search input {
-    border: 0;
-    background: none;
-    padding: 7px 0;
-    box-shadow: none;
   }
   .scroller {
     flex: 1;
@@ -268,6 +271,10 @@
     overflow-x: hidden;
     outline: none;
     position: relative;
+  }
+  .scroller:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: -2px;
   }
   .spacer {
     position: relative;
@@ -278,15 +285,15 @@
     right: 0;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 0 12px 0 8px;
+    gap: var(--space-12);
+    padding: 0 var(--space-12) 0 var(--space-8);
     white-space: nowrap;
   }
   .row:hover {
-    background: var(--hover);
+    background: var(--surface-hover);
   }
   .row.selected {
-    background: var(--selected);
+    background: var(--accent-soft);
   }
   .row.head .subject {
     font-weight: 600;
@@ -300,11 +307,11 @@
     stroke-width: 2;
   }
   .lanes .dash {
-    stroke: var(--muted);
+    stroke: var(--text-3);
     stroke-dasharray: 3 3;
   }
   .lanes .merge {
-    fill: var(--bg);
+    fill: var(--surface);
     stroke-width: 2.2;
   }
   .lanes .head-ring {
@@ -313,8 +320,8 @@
     opacity: 0.6;
   }
   .wip-dot {
-    fill: var(--bg);
-    stroke: var(--muted);
+    fill: var(--surface);
+    stroke: var(--text-3);
     stroke-width: 2;
     stroke-dasharray: 2.5 2;
   }
@@ -323,40 +330,44 @@
     min-width: 0;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: var(--space-6);
+  }
+  .msg .muted {
+    color: var(--text-3);
   }
   .wip-label {
     font-weight: 600;
-    color: var(--accent);
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    color: var(--accent-text);
+    font-family: var(--font-mono);
     font-size: 12px;
   }
-  .ref-pill {
-    color: var(--c);
-    border-color: color-mix(in srgb, var(--c) 55%, transparent);
-    background: color-mix(in srgb, var(--c) 14%, transparent);
-    cursor: pointer;
+  .ref {
+    max-width: 180px;
+    flex-shrink: 0;
+    border: 0;
     font-family: inherit;
+    cursor: pointer;
   }
-  .ref-pill.current {
-    background: var(--c);
-    color: #fff;
-    border-color: var(--c);
+  .ref .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    flex: none;
   }
   .author {
     width: 130px;
-    color: var(--muted);
+    color: var(--text-2);
     flex-shrink: 0;
   }
   .date {
     width: 100px;
-    color: var(--muted);
+    color: var(--text-3);
     flex-shrink: 0;
     font-size: 12px;
   }
   .hash {
     width: 58px;
-    color: var(--faint);
+    color: var(--text-3);
     flex-shrink: 0;
   }
   @media (max-width: 1250px) {
