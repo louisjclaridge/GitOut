@@ -8,6 +8,8 @@ A small, fast, cross-platform desktop git client for Linux and Windows.
 - **Your git, not a reimplementation**: it runs the `git` you already have. SSH keys, credential helpers, hooks, `.gitconfig`, LFS and signing all behave exactly as they do in your terminal.
 - **Easy**: commit graph, one-click stage/unstage, hunk staging, commit and amend, branches, merge and rebase, cherry-pick, revert, reset, tags, stashes, and push/pull/fetch with ahead/behind counts. Right-click anything for more.
 - **Sign in** to GitHub, GitLab (including self-hosted) and Bitbucket. Browse and clone your repositories, and push over HTTPS without passwords. Tokens live in the OS keychain.
+- **Merge editor**: resolve conflicts in three panes (current, result, incoming). Pick a side or both per conflict, edit the result, or keep one side's whole file. Works for merges, rebases, cherry-picks, reverts and stash conflicts.
+- **Releases**: list, create, edit and delete GitHub and GitLab releases from the sidebar. GitOut creates and pushes the tag, suggests the next version, and can list the commits since the last tag as release notes.
 - **Auto-updates** from signed GitHub Releases.
 
 ## Screenshots
@@ -41,7 +43,7 @@ npm run tauri dev       # run the app with hot reload
 npm run tauri build     # build installers into src-tauri/target/release/bundle
 ```
 
-To work on the UI only, run `npm run dev` and open <http://localhost:1420> in a browser. Without Tauri the app uses a mock backend with sample data (`src/dev/mock.ts`).
+To work on the UI only, run `npm run dev` and open <http://localhost:1420> in a browser. Without Tauri the app uses a mock backend with sample data (`src/dev/mock.ts`). Add `?conflict` to the URL to get a merge in progress with conflicted files.
 
 Checks:
 
@@ -57,11 +59,13 @@ src/                      Svelte frontend
   lib/api.ts              typed wrappers for every backend command
   lib/graph.ts            commit-graph lane layout
   lib/repo.svelte.ts      per-repository state + actions
+  lib/conflict.ts         conflict-marker parsing for the merge editor
   lib/components/         UI
 src-tauri/src/
   git.rs                  runs git, parses porcelain/log/ref output
   commands.rs             Tauri commands exposed to the UI
   auth.rs                 OAuth device flow, tokens, provider APIs
+  releases.rs             GitHub/GitLab releases API
   store.rs                settings (JSON in the OS config dir)
 ```
 

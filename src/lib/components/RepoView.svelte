@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api } from "../api";
-  import { app, confirm, run } from "../state.svelte";
+  import { app, confirm, run, runOk } from "../state.svelte";
   import { RepoStore } from "../repo.svelte";
   import Toolbar from "./Toolbar.svelte";
   import Sidebar from "./Sidebar.svelte";
@@ -9,6 +9,9 @@
   import WipPanel from "./WipPanel.svelte";
   import CommitPanel from "./CommitPanel.svelte";
   import DiffView from "./DiffView.svelte";
+  import MergeView from "./MergeView.svelte";
+  import ReleaseView from "./ReleaseView.svelte";
+  import ReleaseEditor from "./ReleaseEditor.svelte";
   import Icon from "./Icon.svelte";
 
   let { repo }: { repo: string } = $props();
@@ -41,11 +44,21 @@
     reverting: "A revert is in progress",
   };
 
-  let conflicts = $derived(store.status?.files.filter((f) => f.conflicted).length ?? 0);
+  let conflicts = $derived(store.conflicted.length);
+  let center = $derived(store.center);
+  let merging = $derived(center.kind === "merge");
+
+  async function abort() {
+    if (!(await confirm("Abort the operation?", "This undoes the operation and returns to where you were before it started.", "Abort", true))) return;
+    if (await runOk(() => api.operationAbort(repo), { done: "Aborted" })) {
+      if (store.center.kind === "merge") store.center = { kind: "graph" };
+    }
+  }
 
   function onKey(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    if (e.key === "Escape" && store.diff) store.diff = null;
+    // The merge editor and release editor hold unsaved work, so Escape doesn't close them.
+    if (e.key === "Escape" && (center.kind === "diff" || center.kind === "release")) store.center = { kind: "graph" };
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r") {
       e.preventDefault();
       void store.load();
@@ -58,38 +71,50 @@
 <div class="repo">
   <Toolbar {store} />
 
-  {#if store.status?.state}
+  {#if store.status?.state || conflicts}
     <div class="notice">
       <div class="k-banner warning">
         <Icon name="warning" size={20} />
         <div class="body">
-          <span class="title">{STATE_LABEL[store.status.state]}.</span>
-          {#if conflicts}
-            Resolve {conflicts} conflicted file{conflicts === 1 ? "" : "s"}, stage them, then continue.
+          {#if store.status?.state}
+            <span class="title">{STATE_LABEL[store.status.state]}.</span>
+            {#if conflicts}
+              Resolve {conflicts} conflicted file{conflicts === 1 ? "" : "s"}, then continue.
+            {:else}
+              All conflicts are resolved. You can continue.
+            {/if}
           {:else}
-            All conflicts are resolved. You can continue.
+            <span class="title">{conflicts} file{conflicts === 1 ? " has" : "s have"} conflicts.</span>
+            Resolve them before you commit.
           {/if}
         </div>
-        <button
-          class="k-btn ghost"
-          onclick={async () =>
-            (await confirm("Abort the operation?", "This undoes the operation and returns to where you were before it started.", "Abort", true)) &&
-            run(() => api.operationAbort(repo), { done: "Aborted" })}>Abort…</button
-        >
-        <button
-          class="k-btn primary"
-          disabled={conflicts > 0}
-          onclick={() => run(() => api.operationContinue(repo), { done: "Continued" })}>Continue</button
-        >
+        {#if conflicts && !merging}
+          <button class="k-btn tinted" onclick={() => store.openMerge(store.conflicted[0].path)}><Icon name="merge" /> Resolve conflicts</button>
+        {/if}
+        {#if store.status?.state}
+          <button class="k-btn ghost" onclick={abort}>Abort…</button>
+          <button
+            class="k-btn primary"
+            disabled={conflicts > 0}
+            onclick={() => run(() => api.operationContinue(repo), { done: "Continued" })}>Continue</button
+          >
+        {/if}
       </div>
     </div>
   {/if}
 
-  <div class="columns">
-    <Sidebar {store} />
+  <div class="columns" class:merging>
+    <!-- Hidden rather than removed while merging, so it keeps its state. -->
+    <div class="side" class:hidden={merging}><Sidebar {store} /></div>
     <div class="center">
-      {#if store.diff}
-        <DiffView {store} target={store.diff} />
+      {#if center.kind === "merge"}
+        {#key center.file}<MergeView {store} file={center.file} />{/key}
+      {:else if center.kind === "release"}
+        <ReleaseView {store} id={center.id} />
+      {:else if center.kind === "release-edit"}
+        {#key center}<ReleaseEditor {store} id={center.id} tag={center.tag} target={center.target} />{/key}
+      {:else if center.kind === "diff"}
+        <DiffView {store} target={center.target} />
       {:else}
         <Graph {store} />
       {/if}
@@ -131,6 +156,18 @@
     display: grid;
     grid-template-columns: 232px minmax(0, 1fr) 340px;
   }
+  .side {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .side.hidden {
+    display: none;
+  }
+  /* The merge editor needs the width for its three panes. */
+  .columns.merging {
+    grid-template-columns: minmax(0, 1fr) 300px;
+  }
   .center {
     min-width: 0;
     min-height: 0;
@@ -148,6 +185,9 @@
   @media (max-width: 1100px) {
     .columns {
       grid-template-columns: 200px minmax(0, 1fr) 300px;
+    }
+    .columns.merging {
+      grid-template-columns: minmax(0, 1fr) 260px;
     }
   }
 </style>

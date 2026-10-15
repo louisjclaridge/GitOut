@@ -55,7 +55,7 @@ fn default_host(provider: &str) -> &'static str {
     }
 }
 
-fn github_api(host: &str) -> String {
+pub(crate) fn github_api(host: &str) -> String {
     if host == "github.com" { "https://api.github.com".into() } else { format!("https://{host}/api/v3") }
 }
 

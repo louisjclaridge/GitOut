@@ -118,6 +118,73 @@ export interface RemoteRepo {
 
 export type DiffMode = "unstaged" | "staged" | "untracked" | "commit";
 
+export interface ReleaseHost {
+  provider: Provider | null;
+  host: string;
+  /** "owner/repo", or a GitLab namespace path. */
+  project: string;
+  /** The git remote tags are pushed to. */
+  remote: string;
+  accountId: string | null;
+  webUrl: string | null;
+  /** GitHub has drafts and pre-releases; GitLab doesn't. */
+  supportsDrafts: boolean;
+  /** Why releases can't be managed here, if they can't. */
+  problem: string | null;
+}
+
+export interface ReleaseAsset {
+  name: string;
+  url: string;
+  size: number | null;
+  downloads: number | null;
+}
+
+export interface Release {
+  /** GitHub: numeric id. GitLab: the tag name. */
+  id: string;
+  tag: string;
+  name: string;
+  body: string;
+  draft: boolean;
+  prerelease: boolean;
+  publishedAt: string | null;
+  createdAt: string | null;
+  author: string | null;
+  url: string | null;
+  assets: ReleaseAsset[];
+}
+
+export interface ReleaseInput {
+  tag: string;
+  name: string;
+  body: string;
+  draft: boolean;
+  prerelease: boolean;
+}
+
+export interface Changelog {
+  previous: string | null;
+  lines: string[];
+}
+
+export interface ConflictSide {
+  title: string;
+  detail: string;
+  /** False when this side deleted the file. */
+  exists: boolean;
+  text: string | null;
+}
+
+export interface ConflictFile {
+  /** The working copy with conflict markers; null if deleted or not UTF-8 text. */
+  working: string | null;
+  binary: boolean;
+  hasBase: boolean;
+  ours: ConflictSide;
+  theirs: ConflictSide;
+}
+
 export const api = {
   settingsGet: () => invoke<Settings>("settings_get"),
   settingsUpdate: (patch: Partial<Settings>) => invoke<Settings>("settings_update", { patch }),
@@ -162,6 +229,20 @@ export const api = {
     invoke<void>("tag_create", { repo, name, target, message }),
   tagDelete: (repo: string, name: string) => invoke<void>("tag_delete", { repo, name }),
   pushTag: (repo: string, name: string) => invoke<void>("push_tag", { repo, name }),
+  remoteTagDelete: (repo: string, name: string) => invoke<void>("remote_tag_delete", { repo, name }),
+
+  releaseHost: (repo: string) => invoke<ReleaseHost>("release_host", { repo }),
+  releasesList: (repo: string) => invoke<Release[]>("releases_list", { repo }),
+  releaseCreate: (repo: string, input: ReleaseInput) => invoke<Release>("release_create", { repo, input }),
+  releaseUpdate: (repo: string, id: string, input: ReleaseInput) => invoke<Release>("release_update", { repo, id, input }),
+  releaseDelete: (repo: string, id: string) => invoke<void>("release_delete", { repo, id }),
+  releaseChangelog: (repo: string, target: string) => invoke<Changelog>("release_changelog", { repo, target }),
+
+  conflictFile: (repo: string, file: string) => invoke<ConflictFile>("conflict_file", { repo, file }),
+  conflictSave: (repo: string, file: string, content: string, stage: boolean) =>
+    invoke<void>("conflict_save", { repo, file, content, stage }),
+  conflictTake: (repo: string, file: string, side: "ours" | "theirs") => invoke<void>("conflict_take", { repo, file, side }),
+  conflictRestart: (repo: string, file: string) => invoke<void>("conflict_restart", { repo, file }),
 
   stashSave: (repo: string, message: string | null, includeUntracked: boolean) =>
     invoke<void>("stash_save", { repo, message, includeUntracked }),

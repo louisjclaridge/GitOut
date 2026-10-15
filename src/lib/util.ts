@@ -55,3 +55,37 @@ export function repoNameFromUrl(url: string): string {
 export function shortHash(h: string): string {
   return h.slice(0, 7);
 }
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  const units = ["KB", "MB", "GB"];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
+}
+
+/** ISO 8601 timestamp to unix seconds, or null. */
+export function isoToUnix(iso: string | null | undefined): number | null {
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
+}
+
+const SEMVER_RE = /^(v?)(\d+)\.(\d+)\.(\d+)$/;
+
+/** The next patch, minor and major versions after the highest x.y.z tag, keeping its "v" prefix. */
+export function nextVersions(tags: string[]): { patch: string; minor: string; major: string } | null {
+  let best: [string, number, number, number] | null = null;
+  for (const t of tags) {
+    const m = SEMVER_RE.exec(t);
+    if (!m) continue;
+    const v: [string, number, number, number] = [m[1], +m[2], +m[3], +m[4]];
+    if (!best || v[1] > best[1] || (v[1] === best[1] && (v[2] > best[2] || (v[2] === best[2] && v[3] > best[3])))) best = v;
+  }
+  if (!best) return null;
+  const [p, major, minor, patch] = best;
+  return { patch: `${p}${major}.${minor}.${patch + 1}`, minor: `${p}${major}.${minor + 1}.0`, major: `${p}${major + 1}.0.0` };
+}

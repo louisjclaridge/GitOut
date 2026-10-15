@@ -50,6 +50,17 @@
 
   function fileMenu(f: FileChange, which: "unstaged" | "staged" | "conflict"): MenuItem[] {
     const items: MenuItem[] = [];
+    if (which === "conflict") {
+      // During a rebase, git's "ours" is the upstream and "theirs" is your commit.
+      const [oursName, theirsName] = store.status?.state === "rebasing" ? ["upstream", "your commit's"] : ["current", "incoming"];
+      items.push(
+        { label: "Resolve in merge editor", icon: "merge", action: () => store.openMerge(f.path) },
+        { label: `Keep ${oursName} version`, icon: "back", action: () => run(() => api.conflictTake(store.path, f.path, "ours"), { done: `Resolved ${f.path}` }) },
+        { label: `Keep ${theirsName} version`, icon: "forward", action: () => run(() => api.conflictTake(store.path, f.path, "theirs"), { done: `Resolved ${f.path}` }) },
+        { label: "Show diff", icon: "file", action: () => showDiff(f, "unstaged") },
+        "sep",
+      );
+    }
     if (which === "unstaged" || which === "conflict")
       items.push({ label: which === "conflict" ? "Mark as resolved" : "Stage", icon: "plus", action: () => run(() => api.stage(store.path, [f.path])) });
     if (which === "staged") items.push({ label: "Unstage", icon: "minus", action: () => run(() => api.unstage(store.path, [f.path])) });
@@ -108,13 +119,13 @@
         <FileRow
           path={f.path}
           status="U"
-          selected={isSel(f, "unstaged")}
-          onclick={() => showDiff(f, "unstaged")}
+          selected={(store.center.kind === "merge" && store.center.file === f.path) || isSel(f, "unstaged")}
+          onclick={() => store.openMerge(f.path)}
           oncontextmenu={(e) => showMenu(e, fileMenu(f, "conflict"))}
         >
           {#snippet actions()}
-            <button class="k-btn" title="Mark as resolved" onclick={(e) => { e.stopPropagation(); run(() => api.stage(store.path, [f.path])); }}>
-              Mark resolved
+            <button class="k-btn" title="Resolve in the merge editor" onclick={(e) => { e.stopPropagation(); store.openMerge(f.path); }}>
+              Resolve
             </button>
           {/snippet}
         </FileRow>

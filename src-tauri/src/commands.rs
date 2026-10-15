@@ -4,6 +4,7 @@
 use crate::auth::{self, DeviceStart, RemoteRepo, TokenStore};
 use crate::error::{Error, Result};
 use crate::git::{self, ChangedFile, Commit, Opts, Ref, Stash, Status};
+use crate::releases::{self, Release, ReleaseHost, ReleaseInput, Releases};
 use crate::store::{Account, OAuthOverrides, Settings, Store};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -651,15 +652,270 @@ pub async fn push(app: AppHandle, state: State<'_, AppState>, repo: String, forc
     network_op(app, &state, Some(repo), args).await.map(|_| ())
 }
 
+/// The remote tags are pushed to and releases are read from: origin, else the first.
+async fn default_remote(repo: String) -> Result<Option<Remote>> {
+    let mut rs = remotes(repo).await?;
+    let i = rs.iter().position(|r| r.name == "origin").unwrap_or(0);
+    Ok((!rs.is_empty()).then(|| rs.swap_remove(i)))
+}
+
+async fn tag_remote(repo: &str) -> Result<String> {
+    default_remote(repo.to_string())
+        .await?
+        .map(|r| r.name)
+        .ok_or_else(|| Error::Other("This repository has no remotes to push to.".into()))
+}
+
 #[tauri::command]
 pub async fn push_tag(app: AppHandle, state: State<'_, AppState>, repo: String, name: String) -> Result<()> {
-    let rs = remotes(repo.clone()).await?;
-    let remote = rs.iter().find(|r| r.name == "origin").or(rs.first())
-        .ok_or_else(|| Error::Other("This repository has no remotes to push to.".into()))?
-        .name
-        .clone();
+    let remote = tag_remote(&repo).await?;
     let args = vec!["push".into(), "--progress".into(), remote, format!("refs/tags/{name}")];
     network_op(app, &state, Some(repo), args).await.map(|_| ())
+}
+
+#[tauri::command]
+pub async fn remote_tag_delete(app: AppHandle, state: State<'_, AppState>, repo: String, name: String) -> Result<()> {
+    let remote = tag_remote(&repo).await?;
+    let args = vec!["push".into(), "--progress".into(), remote, "--delete".into(), format!("refs/tags/{name}")];
+    network_op(app, &state, Some(repo), args).await.map(|_| ())
+}
+
+// ---------------------------------------------------------------- releases
+
+async fn resolve_release_host(state: &AppState, repo: String) -> Result<ReleaseHost> {
+    let Some(remote) = default_remote(repo).await? else {
+        return Ok(ReleaseHost::unavailable("This repository has no remote. Add one to publish releases."));
+    };
+    Ok(releases::resolve_host(&remote.name, &remote.url, &state.store.get().accounts))
+}
+
+async fn releases_api(state: &AppState, repo: String) -> Result<Releases> {
+    let host = resolve_release_host(state, repo).await?;
+    if let Some(problem) = &host.problem {
+        return Err(Error::Other(problem.clone()));
+    }
+    let account = state
+        .store
+        .get()
+        .accounts
+        .into_iter()
+        .find(|a| host.account_id.as_deref() == Some(a.id.as_str()))
+        .ok_or_else(|| Error::Auth("Unknown account".into()))?;
+    let token = auth::access_token(&state.tokens, &account).await?;
+    Releases::new(&host, token)
+}
+
+#[tauri::command]
+pub async fn release_host(state: State<'_, AppState>, repo: String) -> Result<ReleaseHost> {
+    resolve_release_host(&state, repo).await
+}
+
+#[tauri::command]
+pub async fn releases_list(state: State<'_, AppState>, repo: String) -> Result<Vec<Release>> {
+    releases_api(&state, repo).await?.list().await
+}
+
+#[tauri::command]
+pub async fn release_create(state: State<'_, AppState>, repo: String, input: ReleaseInput) -> Result<Release> {
+    if input.tag.trim().is_empty() {
+        return Err(Error::Other("A release needs a tag".into()));
+    }
+    releases_api(&state, repo).await?.create(&input).await
+}
+
+#[tauri::command]
+pub async fn release_update(state: State<'_, AppState>, repo: String, id: String, input: ReleaseInput) -> Result<Release> {
+    releases_api(&state, repo).await?.update(&id, &input).await
+}
+
+/// Deletes the release on the server. Its tag is left alone.
+#[tauri::command]
+pub async fn release_delete(state: State<'_, AppState>, repo: String, id: String) -> Result<()> {
+    releases_api(&state, repo).await?.delete(&id).await
+}
+
+#[derive(Serialize)]
+pub struct Changelog {
+    /// The nearest earlier tag, which the commits are counted from.
+    previous: Option<String>,
+    /// "subject (abc1234)" per commit, newest first, merges left out.
+    lines: Vec<String>,
+}
+
+/// Commits that would go into a release at `target` (a tag, branch or hash).
+#[tauri::command]
+pub async fn release_changelog(repo: String, target: String) -> Result<Changelog> {
+    blocking(move || {
+        let p = path(&repo);
+        let previous = git::run(&p, &["describe", "--tags", "--abbrev=0", &format!("{target}^")])
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+        let range = match &previous {
+            Some(prev) => format!("{prev}..{target}"),
+            None => target.clone(),
+        };
+        let out = git::run(&p, &["log", "--no-merges", "-n500", "--format=%s (%h)", &range, "--"])?;
+        Ok(Changelog { previous, lines: out.lines().map(String::from).collect() })
+    })
+    .await
+}
+
+// ---------------------------------------------------------------- conflicts
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictSide {
+    /// "Current", "Incoming", "Upstream", "Your commit", …
+    title: String,
+    /// Branch name or commit summary.
+    detail: String,
+    /// False when this side deleted the file.
+    exists: bool,
+    /// This side's whole file; None if deleted or not UTF-8 text.
+    text: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConflictFile {
+    /// The working copy, conflict markers and all; None if deleted or not UTF-8 text.
+    working: Option<String>,
+    /// The working copy exists but isn't UTF-8 text, so it can't be edited here.
+    binary: bool,
+    has_base: bool,
+    /// Index stage 2. During a rebase this is the upstream, not your branch.
+    ours: ConflictSide,
+    /// Index stage 3.
+    theirs: ConflictSide,
+}
+
+fn as_text(bytes: Vec<u8>) -> Option<String> {
+    if bytes.contains(&0) {
+        None
+    } else {
+        String::from_utf8(bytes).ok()
+    }
+}
+
+/// (title, detail) for each side of a conflict.
+fn conflict_labels(p: &Path) -> ((String, String), (String, String)) {
+    let git_dir = git::run(p, &["rev-parse", "--absolute-git-dir"]).ok().map(|d| PathBuf::from(d.trim()));
+    let state = git_dir.as_deref().and_then(git::repo_state);
+    let trimmed = |r: Result<String>| r.ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let summary = |rev: &str| trimmed(git::run(p, &["log", "-1", "--format=%h %s", rev, "--"]));
+    let name = |rev: &str| {
+        trimmed(git::run(p, &["name-rev", "--name-only", "--no-undefined", "--exclude=refs/tags/*", rev]))
+            .map(|n| match n.strip_prefix("remotes/") {
+                Some(rest) => rest.to_string(),
+                None => n,
+            })
+    };
+    let current = || {
+        let branch = trimmed(git::run(p, &["symbolic-ref", "--short", "-q", "HEAD"]));
+        ("Current".to_string(), branch.unwrap_or_else(|| "HEAD".into()))
+    };
+    match state.as_deref() {
+        Some("rebasing") => {
+            let onto = git_dir
+                .as_ref()
+                .and_then(|d| ["rebase-merge/onto", "rebase-apply/onto"].iter().find_map(|f| std::fs::read_to_string(d.join(f)).ok()))
+                .map(|s| s.trim().to_string());
+            let onto = onto.as_deref().and_then(|h| name(h).or_else(|| summary(h))).unwrap_or_else(|| "HEAD".into());
+            (("Upstream".into(), onto), ("Your commit".into(), summary("REBASE_HEAD").unwrap_or_default()))
+        }
+        Some("merging") => {
+            let incoming = name("MERGE_HEAD").or_else(|| summary("MERGE_HEAD")).unwrap_or_default();
+            (current(), ("Incoming".into(), incoming))
+        }
+        Some("cherry-picking") => (current(), ("Cherry-pick".into(), summary("CHERRY_PICK_HEAD").unwrap_or_default())),
+        Some("reverting") => (current(), ("Revert".into(), summary("REVERT_HEAD").unwrap_or_default())),
+        // Conflicts with no operation running come from applying a stash.
+        _ => (current(), ("Incoming".into(), "Applied changes".into())),
+    }
+}
+
+fn unmerged_stages(p: &Path, file: &str) -> Result<[Option<String>; 3]> {
+    Ok(git::parse_unmerged(&git::run(p, &["ls-files", "-u", "-z", "--", file])?))
+}
+
+#[tauri::command]
+pub async fn conflict_file(repo: String, file: String) -> Result<ConflictFile> {
+    blocking(move || {
+        let p = path(&repo);
+        let stages = unmerged_stages(&p, &file)?;
+        let blob = |i: usize| {
+            stages[i]
+                .as_deref()
+                .and_then(|sha| git::run_bytes(&p, &["cat-file", "blob", sha]).ok())
+                .and_then(as_text)
+        };
+        let (working, binary) = match std::fs::read(p.join(&file)) {
+            Ok(bytes) => {
+                let text = as_text(bytes);
+                let binary = text.is_none();
+                (text, binary)
+            }
+            Err(_) => (None, false),
+        };
+        let ((ours_title, ours_detail), (theirs_title, theirs_detail)) = conflict_labels(&p);
+        Ok(ConflictFile {
+            working,
+            binary,
+            has_base: stages[0].is_some(),
+            ours: ConflictSide { title: ours_title, detail: ours_detail, exists: stages[1].is_some(), text: blob(1) },
+            theirs: ConflictSide {
+                title: theirs_title,
+                detail: theirs_detail,
+                exists: stages[2].is_some(),
+                text: blob(2),
+            },
+        })
+    })
+    .await
+}
+
+/// Write the merged result to the working copy; `stage` also marks it resolved.
+#[tauri::command]
+pub async fn conflict_save(repo: String, file: String, content: String, stage: bool) -> Result<()> {
+    blocking(move || {
+        let p = path(&repo);
+        std::fs::write(p.join(&file), content)?;
+        if stage {
+            git::run(&p, &["add", "--", &file])?;
+        }
+        Ok(())
+    })
+    .await
+}
+
+/// Resolve by taking one side's whole file. If that side deleted it, delete it.
+/// `side`: "ours" | "theirs"
+#[tauri::command]
+pub async fn conflict_take(repo: String, file: String, side: String) -> Result<()> {
+    let (flag, stage) = match side.as_str() {
+        "ours" => ("--ours", 2),
+        "theirs" => ("--theirs", 3),
+        s => return Err(Error::Other(format!("invalid side {s}"))),
+    };
+    blocking(move || {
+        let p = path(&repo);
+        if unmerged_stages(&p, &file)?[stage - 1].is_some() {
+            git::run(&p, &["checkout", flag, "--", &file])?;
+            git::run(&p, &["add", "--", &file])?;
+        } else {
+            git::run(&p, &["rm", "-q", "-f", "--ignore-unmatch", "--", &file])?;
+        }
+        Ok(())
+    })
+    .await
+}
+
+/// Throw away edits to a conflicted file and write its conflict markers again,
+/// this time with the common ancestor's lines included.
+#[tauri::command]
+pub async fn conflict_restart(repo: String, file: String) -> Result<()> {
+    blocking(move || git::run(&path(&repo), &["checkout", "--conflict=diff3", "--", &file]).map(|_| ())).await
 }
 
 // ---------------------------------------------------------------- accounts

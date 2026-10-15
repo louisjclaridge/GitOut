@@ -2,7 +2,7 @@
 // browser (`npm run dev`, then open http://localhost:1420) without Rust.
 // Loaded from main.ts only when not running inside Tauri.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { Commit, Ref, Settings, Status } from "../lib/api";
+import type { Commit, Ref, Release, ReleaseInput, Settings, Status } from "../lib/api";
 
 const REPO = "/home/dev/projects/gitout-demo";
 const now = Math.floor(Date.now() / 1000);
@@ -69,6 +69,94 @@ const status: Status = {
     { path: "docs/notes.md", origPath: null, index: ".", worktree: "?", conflicted: false },
   ],
 };
+
+// Open the dev server with ?conflict to see the merge editor.
+const DEMO_CONFLICT = new URLSearchParams(location.search).has("conflict");
+if (DEMO_CONFLICT) {
+  status.state = "merging";
+  status.files.unshift(
+    { path: "src/lib/util.ts", origPath: null, index: "U", worktree: "U", conflicted: true },
+    { path: "docs/logo.png", origPath: null, index: "U", worktree: "U", conflicted: true },
+  );
+}
+
+const CONFLICTED = `export function relativeTime(unix: number): string {
+  const s = Math.floor(Date.now() / 1000) - unix;
+<<<<<<< HEAD
+  if (s < 60) return "just now";
+  if (s < 3600) return \`\${Math.floor(s / 60)} min ago\`;
+=======
+  if (s < 45) return "a moment ago";
+>>>>>>> feature/staging-ui
+  const units: [number, string][] = [
+    [60, "minute"],
+    [3600, "hour"],
+    [86400, "day"],
+    [604800, "week"],
+    [2629800, "month"],
+    [31557600, "year"],
+  ];
+  let i = units.length - 1;
+  while (i > 0 && s < units[i][0]) i--;
+  const n = Math.floor(s / units[i][0]);
+  return \`\${n} \${units[i][1]}\${n === 1 ? "" : "s"} ago\`;
+}
+
+export function basename(p: string): string {
+<<<<<<< HEAD
+  return p.split(/[\\/]/).filter(Boolean).pop() ?? p;
+||||||| base
+  return p.split("/").pop() ?? p;
+=======
+  const parts = p.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? p;
+>>>>>>> feature/staging-ui
+}
+`;
+
+let releases: Release[] = [
+  {
+    id: "2",
+    tag: "v0.2.0",
+    name: "GitOut 0.2",
+    body: "Changes since v0.1.0:\n\n- Hunk staging (abc1234)\n- Commit box with amend (def5678)",
+    draft: false,
+    prerelease: false,
+    publishedAt: new Date((now - 86400 * 3) * 1000).toISOString(),
+    createdAt: new Date((now - 86400 * 3) * 1000).toISOString(),
+    author: "ada",
+    url: "https://github.com/ada/gitout/releases/tag/v0.2.0",
+    assets: [{ name: "gitout_0.2.0_amd64.deb", url: "https://example.com/gitout.deb", size: 9_830_400, downloads: 312 }],
+  },
+  {
+    id: "1",
+    tag: "v0.1.0",
+    name: "",
+    body: "",
+    draft: false,
+    prerelease: true,
+    publishedAt: new Date((now - 86400 * 40) * 1000).toISOString(),
+    createdAt: new Date((now - 86400 * 40) * 1000).toISOString(),
+    author: "ada",
+    url: "https://github.com/ada/gitout/releases/tag/v0.1.0",
+    assets: [],
+  },
+];
+
+function saveRelease(id: string | null, input: ReleaseInput): Release {
+  const old = releases.find((r) => r.id === id);
+  const r: Release = {
+    id: old?.id ?? String(Date.now()),
+    url: `https://github.com/ada/gitout/releases/tag/${input.tag}`,
+    author: "ada",
+    assets: old?.assets ?? [],
+    createdAt: old?.createdAt ?? new Date().toISOString(),
+    publishedAt: input.draft ? null : (old?.publishedAt ?? new Date().toISOString()),
+    ...input,
+  };
+  releases = old ? releases.map((x) => (x === old ? r : x)) : [r, ...releases];
+  return r;
+}
 
 let settings: Settings = {
   recentRepos: [REPO, "/home/dev/projects/website", "/home/dev/work/api-server"],
@@ -141,6 +229,43 @@ export function installMock() {
         }
         case "diff":
           return DIFF;
+        case "release_host":
+          return {
+            provider: "github",
+            host: "github.com",
+            project: "ada/gitout",
+            remote: "origin",
+            accountId: "github:github.com:ada",
+            webUrl: "https://github.com/ada/gitout/releases",
+            supportsDrafts: true,
+            problem: null,
+          };
+        case "releases_list":
+          return releases;
+        case "release_create":
+          return saveRelease(null, a.input as ReleaseInput);
+        case "release_update":
+          return saveRelease(String(a.id), a.input as ReleaseInput);
+        case "release_delete":
+          releases = releases.filter((r) => r.id !== a.id);
+          return null;
+        case "release_changelog":
+          return { previous: "v0.1.0", lines: commits.slice(0, 5).map((c) => `${c.subject} (${c.hash.slice(0, 7)})`) };
+        case "conflict_file": {
+          const binary = a.file === "docs/logo.png";
+          return {
+            working: binary ? null : CONFLICTED,
+            binary,
+            hasBase: true,
+            ours: { title: "Current", detail: "main", exists: true, text: binary ? null : "" },
+            theirs: { title: "Incoming", detail: "feature/staging-ui", exists: true, text: binary ? null : "" },
+          };
+        }
+        case "conflict_save":
+        case "conflict_take":
+          if (a.stage !== false) status.files = status.files.filter((f) => f.path !== a.file);
+          if (!status.files.some((f) => f.conflicted)) status.state = null;
+          return null;
         case "auth_list_repos":
           return [
             { fullName: "ada/analytical-engine", description: "Notes on the engine", private: false, httpsUrl: "https://github.com/ada/analytical-engine.git", sshUrl: "git@github.com:ada/analytical-engine.git" },

@@ -6,10 +6,12 @@
   import Archive from "@lucide/svelte/icons/archive";
   import ArrowDownToLine from "@lucide/svelte/icons/arrow-down-to-line";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import ArrowRight from "@lucide/svelte/icons/arrow-right";
   import ArrowUpFromLine from "@lucide/svelte/icons/arrow-up-from-line";
   import Check from "@lucide/svelte/icons/check";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
   import CircleX from "@lucide/svelte/icons/circle-x";
   import CloudDownload from "@lucide/svelte/icons/cloud-download";
@@ -24,10 +26,13 @@
   import Folder from "@lucide/svelte/icons/folder";
   import GitBranch from "@lucide/svelte/icons/git-branch";
   import GitCommitHorizontal from "@lucide/svelte/icons/git-commit-horizontal";
+  import GitMerge from "@lucide/svelte/icons/git-merge";
   import House from "@lucide/svelte/icons/house";
   import Info from "@lucide/svelte/icons/info";
   import Minus from "@lucide/svelte/icons/minus";
+  import Package from "@lucide/svelte/icons/package";
   import Palette from "@lucide/svelte/icons/palette";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Search from "@lucide/svelte/icons/search";
@@ -58,6 +63,8 @@
     check: Check,
     chevron: ChevronRight,
     down: ChevronDown,
+    up: ChevronUp,
+    forward: ArrowRight,
     back: ArrowLeft,
     tag: Tag,
     cloud: Cloud,
@@ -66,6 +73,9 @@
     undo: Undo2,
     more: Ellipsis,
     commit: GitCommitHorizontal,
+    merge: GitMerge,
+    release: Package,
+    pencil: Pencil,
     file: File,
     external: ExternalLink,
     terminal: Terminal,

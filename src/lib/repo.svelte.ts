@@ -1,8 +1,8 @@
 // State and actions for one open repository.
-import { openPath } from "@tauri-apps/plugin-opener";
-import { api, type Commit, type DiffMode, type Ref, type Stash, type Status } from "./api";
+import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { api, type Commit, type DiffMode, type Ref, type Release, type ReleaseHost, type Stash, type Status } from "./api";
 import { layoutGraph } from "./graph";
-import { app, ask, confirm, prompt, run, runOk, toast } from "./state.svelte";
+import { app, ask, confirm, errorText, prompt, run, runOk, toast } from "./state.svelte";
 import type { MenuItem } from "./menu.svelte";
 import { shortHash } from "./util";
 
@@ -15,6 +15,15 @@ export interface DiffTarget {
   hash?: string;
 }
 
+/** What the centre pane shows. */
+export type CenterView =
+  | { kind: "graph" }
+  | { kind: "diff"; target: DiffTarget }
+  | { kind: "merge"; file: string }
+  | { kind: "release"; id: string }
+  /** `id` null creates a new release, optionally from `tag` or at `target`. */
+  | { kind: "release-edit"; id: string | null; tag?: string; target?: string };
+
 const PAGE = 2000;
 
 export class RepoStore {
@@ -24,7 +33,7 @@ export class RepoStore {
   refs = $state<Ref[]>([]);
   stashes = $state<Stash[]>([]);
   selected = $state<Selection>(null);
-  diff = $state<DiffTarget | null>(null);
+  center = $state<CenterView>({ kind: "graph" });
   limit = $state(PAGE);
   loaded = $state(false);
   /** Request the graph to scroll a commit into view. */
@@ -35,6 +44,15 @@ export class RepoStore {
   hasMore = $derived(this.commits.length >= this.limit);
   headHash = $derived(this.status?.head ?? null);
   currentBranch = $derived(this.status?.branch ?? null);
+  conflicted = $derived(this.status?.files.filter((f) => f.conflicted) ?? []);
+
+  /** The diff in the centre pane, if that's what it shows. Setting it replaces the pane. */
+  get diff(): DiffTarget | null {
+    return this.center.kind === "diff" ? this.center.target : null;
+  }
+  set diff(target: DiffTarget | null) {
+    this.center = target ? { kind: "diff", target } : { kind: "graph" };
+  }
 
   constructor(path: string) {
     this.path = path;
@@ -95,8 +113,10 @@ export class RepoStore {
 
   // ------------------------------------------------------------ sync
 
-  fetch() {
-    return run(() => api.fetch(this.path), { label: "Fetching", done: "Fetched from all remotes" });
+  async fetch() {
+    await run(() => api.fetch(this.path), { label: "Fetching", done: "Fetched from all remotes" });
+    // Fetch is the "catch up with the server" action, so refresh releases too once they've been looked at.
+    if (this.releasesStatus !== "idle") void this.loadReleases();
   }
   pull() {
     return run(() => api.pull(this.path), { label: "Pulling", done: "Pulled" });
@@ -222,6 +242,7 @@ export class RepoStore {
     return [
       { label: "Create branch here…", icon: "branch", action: () => this.createBranch(c.hash) },
       { label: "Create tag here…", icon: "tag", action: () => this.createTag(c.hash) },
+      { label: "Create release here…", icon: "release", action: () => this.newRelease({ target: c.hash }) },
       "sep",
       { label: "Check out this commit", icon: "commit", action: () => this.checkoutCommit(c.hash), disabled: isHead },
       { label: "Cherry-pick onto current branch", icon: "plus", action: () => run(() => api.cherryPick(this.path, c.hash), { done: "Cherry-picked" }), disabled: isHead },
@@ -252,8 +273,12 @@ export class RepoStore {
     items.push("sep", { label: "Create branch here…", icon: "plus", action: () => this.createBranch(ref.short) });
     if (ref.kind === "local") items.push({ label: "Rename…", icon: "commit", action: () => this.renameBranch(ref) });
     if (ref.kind === "tag") {
+      const release = this.releaseFor(ref.short);
       items.push(
         { label: "Push tag", icon: "push", action: () => run(() => api.pushTag(this.path, ref.short), { label: `Pushing ${ref.short}`, done: `Pushed ${ref.short}` }) },
+        release
+          ? { label: "Show release", icon: "release", action: () => this.showRelease(release.id) }
+          : { label: "Create release…", icon: "release", action: () => this.newRelease({ tag: ref.short }) },
         "sep",
         { label: "Delete tag", icon: "x", danger: true, action: async () => (await confirm("Delete tag?", `Delete local tag ${ref.short}?`, "Delete", true)) && run(() => api.tagDelete(this.path, ref.short), { done: `Deleted ${ref.short}` }) },
       );
@@ -290,6 +315,93 @@ export class RepoStore {
       { label: "Pop (apply and remove)", icon: "pop", action: () => run(() => api.stashAction(this.path, s.index, "pop"), { done: "Stash popped" }) },
       "sep",
       { label: "Delete", icon: "x", danger: true, action: async () => (await confirm("Delete stash?", s.message, "Delete", true)) && run(() => api.stashAction(this.path, s.index, "drop"), { done: "Stash deleted" }) },
+    ];
+  }
+
+  // ------------------------------------------------------------ conflicts
+
+  /** Open a conflicted file in the merge editor, with the change list beside it. */
+  openMerge(file: string) {
+    this.selected = { kind: "wip" };
+    this.center = { kind: "merge", file };
+  }
+
+  // ------------------------------------------------------------ releases
+
+  releaseHost = $state<ReleaseHost | null>(null);
+  releases = $state<Release[]>([]);
+  /** Releases come from the hosting API, so they load on demand, not with every refresh. */
+  releasesStatus = $state<"idle" | "loading" | "loaded" | "error">("idle");
+  releasesError = $state("");
+
+  async loadReleases() {
+    this.releasesStatus = "loading";
+    try {
+      const host = await api.releaseHost(this.path);
+      this.releaseHost = host;
+      this.releases = host.problem ? [] : await api.releasesList(this.path);
+      this.releasesStatus = "loaded";
+    } catch (e) {
+      this.releasesError = errorText(e);
+      this.releasesStatus = "error";
+    }
+  }
+
+  releaseFor(tag: string): Release | undefined {
+    return this.releases.find((r) => r.tag === tag);
+  }
+
+  tagRef(tag: string): Ref | undefined {
+    return this.refs.find((r) => r.kind === "tag" && r.short === tag);
+  }
+
+  showRelease(id: string) {
+    this.center = { kind: "release", id };
+  }
+
+  newRelease(from: { tag?: string; target?: string } = {}) {
+    this.center = { kind: "release-edit", id: null, ...from };
+    if (this.releasesStatus === "idle") void this.loadReleases();
+  }
+
+  editRelease(r: Release) {
+    this.center = { kind: "release-edit", id: r.id };
+  }
+
+  async deleteRelease(r: Release) {
+    const title = r.name || r.tag;
+    const local = !!this.tagRef(r.tag);
+    const remote = this.releaseHost?.remote ?? "the remote";
+    const files = r.assets.length ? `, including its ${r.assets.length} attached file${r.assets.length === 1 ? "" : "s"}` : "";
+    const res = await ask({
+      title: `Delete ${title}?`,
+      message: `This deletes the release on ${this.releaseHost?.host ?? "the server"}${files}. It can't be undone.`,
+      confirmText: "Delete release",
+      danger: true,
+      fields: [
+        { key: "tag", label: `Also delete the tag ${r.tag} from ${remote}${local ? " and this computer" : ""}`, type: "checkbox", checked: false },
+      ],
+    });
+    if (!res) return;
+    if (!(await runOk(() => api.releaseDelete(this.path, r.id), { label: `Deleting ${title}`, done: `Deleted ${title}` }))) return;
+    if (this.center.kind === "release" && this.center.id === r.id) this.center = { kind: "graph" };
+    if (res.tag === true) {
+      const pushed = await runOk(() => api.remoteTagDelete(this.path, r.tag), { label: `Deleting tag ${r.tag}`, done: `Deleted ${r.tag} from ${remote}` });
+      if (pushed && local) await run(() => api.tagDelete(this.path, r.tag));
+    }
+    await this.loadReleases();
+  }
+
+  releaseMenu(r: Release): MenuItem[] {
+    const tag = this.tagRef(r.tag);
+    const url = r.url;
+    return [
+      { label: "Edit…", icon: "pencil", action: () => this.editRelease(r) },
+      { label: "Show tagged commit", icon: "commit", action: () => tag && this.selectCommit(tag.target), disabled: !tag },
+      { label: "Open in browser", icon: "external", action: () => url && run(() => openUrl(url)), disabled: !url },
+      { label: "Copy link", icon: "copy", action: () => url && copy(url, "Link copied"), disabled: !url },
+      "sep",
+      { label: "Delete release…", icon: "x", danger: true, action: () => this.deleteRelease(r) },
     ];
   }
 

@@ -84,6 +84,16 @@ pub fn run<S: AsRef<std::ffi::OsStr>>(repo: &Path, args: &[S]) -> Result<String>
     run_with(Some(repo), args, Opts::default())
 }
 
+/// Like `run`, but returns stdout untouched, for file contents that may not be UTF-8.
+pub fn run_bytes<S: AsRef<std::ffi::OsStr>>(repo: &Path, args: &[S]) -> Result<Vec<u8>> {
+    let out = base_command(Some(repo)).args(args).stdin(Stdio::null()).output().map_err(spawn_err)?;
+    if out.status.success() {
+        Ok(out.stdout)
+    } else {
+        Err(failure(out.status.code(), &out.stdout, &out.stderr))
+    }
+}
+
 /// Run a long network operation, reporting each progress line from stderr
 /// (git separates progress updates with `\r`) to `on_progress`.
 pub fn run_streaming<S: AsRef<std::ffi::OsStr>>(
@@ -421,9 +431,34 @@ pub fn parse_name_status(out: &str) -> Vec<ChangedFile> {
     files
 }
 
+/// Which index stages exist for a conflicted path, from `git ls-files -u -z`:
+/// "mode sha stage\tpath" records. Returns the blob for stages 1 (base),
+/// 2 (ours) and 3 (theirs); a missing stage means that side deleted the file.
+pub fn parse_unmerged(out: &str) -> [Option<String>; 3] {
+    let mut stages: [Option<String>; 3] = Default::default();
+    for rec in out.split('\0').filter(|r| !r.is_empty()) {
+        let Some((meta, _path)) = rec.split_once('\t') else { continue };
+        let f: Vec<&str> = meta.split(' ').collect();
+        if let (Some(sha), Some(Ok(n))) = (f.get(1), f.get(2).map(|n| n.parse::<usize>())) {
+            if (1..=3).contains(&n) {
+                stages[n - 1] = Some(sha.to_string());
+            }
+        }
+    }
+    stages
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unmerged_stages() {
+        let s = parse_unmerged("100644 aaa 1\tf.txt\0100644 bbb 2\tf.txt\0");
+        assert_eq!(s[0].as_deref(), Some("aaa"));
+        assert_eq!(s[1].as_deref(), Some("bbb"));
+        assert!(s[2].is_none());
+    }
 
     #[test]
     fn status_v2() {

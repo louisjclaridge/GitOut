@@ -2,6 +2,7 @@ mod auth;
 mod commands;
 mod error;
 mod git;
+mod releases;
 mod store;
 
 use commands::AppState;
@@ -73,6 +74,17 @@ pub fn run() {
             commands::tag_create,
             commands::tag_delete,
             commands::push_tag,
+            commands::remote_tag_delete,
+            commands::release_host,
+            commands::releases_list,
+            commands::release_create,
+            commands::release_update,
+            commands::release_delete,
+            commands::release_changelog,
+            commands::conflict_file,
+            commands::conflict_save,
+            commands::conflict_take,
+            commands::conflict_restart,
             commands::stash_save,
             commands::stash_action,
             commands::fetch,

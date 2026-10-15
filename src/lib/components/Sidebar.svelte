@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { Ref } from "../api";
+  import type { Ref, Release } from "../api";
   import type { RepoStore } from "../repo.svelte";
   import { showMenu } from "../menu.svelte";
   import Icon from "./Icon.svelte";
 
   let { store }: { store: RepoStore } = $props();
 
-  let open = $state<Record<string, boolean>>({ local: true, remote: true, tags: false, stashes: true });
+  let open = $state<Record<string, boolean>>({ local: true, remote: true, tags: false, releases: false, stashes: true });
   let filter = $state("");
 
   const match = (r: Ref) => !filter || r.short.toLowerCase().includes(filter.toLowerCase());
@@ -14,6 +14,10 @@
 
   let local = $derived(store.refs.filter((r) => r.kind === "local" && match(r)).sort(byName));
   let tags = $derived(store.refs.filter((r) => r.kind === "tag" && match(r)));
+  let releases = $derived(
+    store.releases.filter((r: Release) => !filter || `${r.name} ${r.tag}`.toLowerCase().includes(filter.toLowerCase())),
+  );
+  let shownRelease = $derived(store.center.kind === "release" ? store.center.id : null);
   let remotes = $derived.by(() => {
     const groups = new Map<string, Ref[]>();
     for (const r of store.refs) {
@@ -28,14 +32,15 @@
 
   function toggle(k: string) {
     open[k] = !open[k];
+    if (k === "releases" && open[k] && store.releasesStatus === "idle") void store.loadReleases();
   }
 </script>
 
-{#snippet header(key: string, label: string, count: number)}
+{#snippet header(key: string, label: string, count: number | null)}
   <button class="head" aria-expanded={open[key]} onclick={() => toggle(key)}>
     <span class="chev" class:open={open[key]}><Icon name="chevron" size={12} /></span>
     <span class="k-label">{label}</span>
-    <span class="n">{count}</span>
+    {#if count !== null}<span class="n">{count}</span>{/if}
   </button>
 {/snippet}
 
@@ -91,6 +96,36 @@
       <div class="k-list">
         {#each tags as r (r.name)}{@render refRow(r, r.short)}{/each}
         {#if !tags.length}<div class="none">No tags</div>{/if}
+      </div>
+    {/if}
+
+    {@render header("releases", "Releases", store.releasesStatus === "loaded" && !store.releaseHost?.problem ? releases.length : null)}
+    {#if open.releases}
+      <div class="k-list">
+        {#if store.releasesStatus === "loading" && !store.releases.length}
+          <div class="none"><span class="k-spinner" role="status" aria-label="Loading releases"></span></div>
+        {:else if store.releasesStatus === "error"}
+          <div class="none selectable">{store.releasesError}</div>
+          <button class="k-item" onclick={() => store.loadReleases()}><Icon name="refresh" size={14} /><span class="name">Try again</span></button>
+        {:else if store.releaseHost?.problem}
+          <div class="none">{store.releaseHost.problem}</div>
+        {:else}
+          <button class="k-item" onclick={() => store.newRelease()}><Icon name="plus" size={14} /><span class="name">New release…</span></button>
+          {#each releases as r (r.id)}
+            <button
+              class="k-item"
+              aria-current={shownRelease === r.id ? "true" : undefined}
+              title={r.name && r.name !== r.tag ? `${r.name} (${r.tag})` : r.tag}
+              onclick={() => store.showRelease(r.id)}
+              oncontextmenu={(e) => showMenu(e, store.releaseMenu(r))}
+            >
+              <Icon name="release" size={14} />
+              <span class="name">{r.name || r.tag}</span>
+              {#if r.draft}<span class="meta">Draft</span>{:else if r.prerelease}<span class="meta">Pre-release</span>{/if}
+            </button>
+          {/each}
+          {#if !store.releases.length}<div class="none">No releases yet</div>{/if}
+        {/if}
       </div>
     {/if}
 
