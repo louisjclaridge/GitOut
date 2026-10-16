@@ -190,10 +190,11 @@
     flex-direction: column;
   }
   h1 {
-    font-size: 20px;
-    line-height: 26px;
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-family: var(--font-display);
+    font-size: 22px;
+    line-height: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
     margin-bottom: var(--space-24);
   }
   .avatar {

@@ -16,7 +16,7 @@ body {
   cursor: default;
 }
 
-/* Keel sets 13/20 Instrument Sans on .k-app; form controls don't inherit by default. */
+/* Keel sets 13/20 Figtree on .k-app; form controls don't inherit by default. */
 button,
 input,
 textarea,
@@ -75,8 +75,8 @@ code {
 .k-field > .label {
   font-size: 12px;
   line-height: 16px;
-  font-weight: 500;
-  color: var(--text-2);
+  font-weight: 600;
+  color: var(--text-3);
 }
 
 /* A search field: a k-input with a search icon inside its left padding. */

@@ -128,10 +128,11 @@
     gap: var(--space-16);
   }
   h1 {
+    font-family: var(--font-display);
     font-size: 28px;
-    line-height: 34px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    line-height: 32px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
   }
   .brand p {
     color: var(--text-2);

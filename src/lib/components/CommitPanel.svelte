@@ -107,9 +107,10 @@
     align-self: flex-start;
   }
   h2 {
+    font-family: var(--font-display);
     font-size: 15px;
     line-height: 20px;
-    font-weight: 600;
+    font-weight: 700;
     word-break: break-word;
   }
   .body {
