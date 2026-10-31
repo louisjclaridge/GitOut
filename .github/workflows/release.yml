@@ -2,7 +2,8 @@
 # release → choose a tag → Publish). This workflow stamps that version into
 # the app, builds signed Linux and Windows installers and uploads them to the
 # release, along with the latest.json the in-app updater reads. Nothing needs
-# bumping or committing in the repo first.
+# bumping or committing in the repo first. The release's notes are required:
+# they're baked into the app's "What's new" popup.
 name: Release
 
 on:
@@ -13,7 +14,26 @@ permissions:
   contents: write
 
 jobs:
+  # The release notes become the app's "What's new" popup, so a release can't
+  # ship without them. Runs first and fails in seconds rather than after the
+  # builds. Reads the release as it is now, not the publish event, so after
+  # adding notes you can just re-run the failed jobs.
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the release has notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          body=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+          if [ -z "$(printf '%s' "$body" | tr -d '[:space:]')" ]; then
+            echo "::error title=Release notes missing::Release $TAG has no notes. They're shown in the app's What's new popup after updating. Edit the release on GitHub to add them (optionally under a '## What's new' heading), then re-run the failed jobs."
+            exit 1
+          fi
+
   build:
+    needs: notes
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +79,12 @@ jobs:
       - name: Set app version from release tag
         shell: bash
         run: node scripts/sync-version.mjs "${{ github.event.release.tag_name }}"
+      - name: Bake release notes into What's new
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body > src/whats-new.md
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

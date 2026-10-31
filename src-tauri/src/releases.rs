@@ -77,6 +77,8 @@ pub struct ReleaseHost {
     pub web_url: Option<String>,
     /// GitHub has drafts and pre-releases; GitLab doesn't.
     pub supports_drafts: bool,
+    /// Whether GitOut can show CI/CD runs from this host.
+    pub supports_ci: bool,
     /// Why releases can't be managed here, if they can't.
     pub problem: Option<String>,
 }
@@ -91,6 +93,7 @@ impl ReleaseHost {
             account_id: None,
             web_url: None,
             supports_drafts: false,
+            supports_ci: false,
             problem: Some(problem.into()),
         }
     }
@@ -128,6 +131,7 @@ pub fn resolve_host(remote: &str, url: &str, accounts: &[Account]) -> ReleaseHos
         account_id: account.map(|a| a.id.clone()),
         web_url,
         supports_drafts: provider == Some("github"),
+        supports_ci: crate::ci::supported(provider),
         problem,
     }
 }
@@ -255,6 +259,12 @@ fn error_detail(v: &Value) -> Option<String> {
 }
 
 async fn check(resp: reqwest::Response) -> Result<reqwest::Response> {
+    check_with(resp, "manage releases").await
+}
+
+/// Turn an unsuccessful API response into a readable error. `action` completes
+/// "You don't have permission to …" for a 403.
+pub(crate) async fn check_with(resp: reqwest::Response, action: &str) -> Result<reqwest::Response> {
     let status = resp.status();
     if status.is_success() {
         return Ok(resp);
@@ -266,8 +276,8 @@ async fn check(resp: reqwest::Response) -> Result<reqwest::Response> {
         .unwrap_or_else(|| text.chars().take(200).collect());
     Err(Error::Other(match status.as_u16() {
         401 => "The server rejected your sign-in. Sign in again under Settings → Accounts.".into(),
-        403 => format!("You don't have permission to manage releases in this project. ({detail})"),
-        404 => format!("The project or release wasn't found, or your account can't see it. ({detail})"),
+        403 => format!("You don't have permission to {action} in this project. ({detail})"),
+        404 => format!("The project or item wasn't found, or your account can't see it. ({detail})"),
         _ => format!("Server returned {status}: {detail}"),
     }))
 }

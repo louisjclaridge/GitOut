@@ -1,4 +1,5 @@
 mod auth;
+mod ci;
 mod commands;
 mod error;
 mod git;
@@ -81,6 +82,8 @@ pub fn run() {
             commands::release_update,
             commands::release_delete,
             commands::release_changelog,
+            commands::ci_runs,
+            commands::ci_jobs,
             commands::conflict_file,
             commands::conflict_save,
             commands::conflict_take,

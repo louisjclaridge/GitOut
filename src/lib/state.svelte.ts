@@ -46,6 +46,35 @@ export const app = $state({
   refreshTick: 0,
 });
 
+// ---------------------------------------------------------------- layout
+
+export const SIDEBAR_WIDTH = 232;
+export const DETAILS_WIDTH = 340;
+
+function storedWidth(key: string, fallback: number): number {
+  try {
+    const v = Number(localStorage.getItem(`gitout.${key}`));
+    return Number.isFinite(v) && v > 0 ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Column widths in the repository view, shared by every tab and kept across restarts. */
+export const layout = $state({
+  sidebar: storedWidth("sidebarWidth", SIDEBAR_WIDTH),
+  details: storedWidth("detailsWidth", DETAILS_WIDTH),
+});
+
+export function saveLayout() {
+  try {
+    localStorage.setItem("gitout.sidebarWidth", String(layout.sidebar));
+    localStorage.setItem("gitout.detailsWidth", String(layout.details));
+  } catch {
+    /* storage unavailable; widths reset next launch */
+  }
+}
+
 let toastId = 0;
 export function toast(text: string, kind: Toast["kind"] = "info") {
   const id = ++toastId;

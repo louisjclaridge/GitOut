@@ -22,6 +22,8 @@ export interface Settings {
   pullMode: "merge" | "rebase" | "ff-only";
   autoUpdate: boolean;
   oauth: { githubClientId?: string | null; gitlabClientId?: string | null };
+  /** The version whose "What's new" notes were last shown. */
+  lastSeenVersion: string | null;
 }
 
 export interface RepoInfo {
@@ -129,6 +131,8 @@ export interface ReleaseHost {
   webUrl: string | null;
   /** GitHub has drafts and pre-releases; GitLab doesn't. */
   supportsDrafts: boolean;
+  /** Whether GitOut can show CI/CD runs from this host. */
+  supportsCi: boolean;
   /** Why releases can't be managed here, if they can't. */
   problem: string | null;
 }
@@ -185,6 +189,54 @@ export interface ConflictFile {
   theirs: ConflictSide;
 }
 
+/** Every host's run states are mapped onto these by the backend (src-tauri/src/ci.rs). */
+export type RunStatus = "queued" | "waiting" | "running" | "completed";
+
+/** One run of a CI/CD pipeline: a GitHub workflow run, a GitLab pipeline, an Azure DevOps build. */
+export interface CiRun {
+  /** Opaque; passed back to fetch the run's jobs. */
+  id: string;
+  /** The pipeline's name, e.g. "CI". */
+  name: string;
+  /** Usually the commit subject or PR title. */
+  title: string;
+  status: RunStatus;
+  /** Set once completed: "success" | "failure" | "cancelled" | "skipped" | "timed_out" | "action_required" | "neutral" */
+  conclusion: string | null;
+  branch: string | null;
+  headSha: string;
+  /** What started it, e.g. "push" or "pull request". */
+  trigger: string;
+  /** The run number shown on the host, e.g. #42. */
+  number: number;
+  attempt: number;
+  actor: string | null;
+  createdAt: string | null;
+  startedAt: string | null;
+  updatedAt: string | null;
+  url: string | null;
+}
+
+export interface CiStep {
+  number: number;
+  name: string;
+  status: RunStatus;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface CiJob {
+  id: string;
+  name: string;
+  status: RunStatus;
+  conclusion: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  url: string | null;
+  steps: CiStep[];
+}
+
 export const api = {
   settingsGet: () => invoke<Settings>("settings_get"),
   settingsUpdate: (patch: Partial<Settings>) => invoke<Settings>("settings_update", { patch }),
@@ -237,6 +289,9 @@ export const api = {
   releaseUpdate: (repo: string, id: string, input: ReleaseInput) => invoke<Release>("release_update", { repo, id, input }),
   releaseDelete: (repo: string, id: string) => invoke<void>("release_delete", { repo, id }),
   releaseChangelog: (repo: string, target: string) => invoke<Changelog>("release_changelog", { repo, target }),
+
+  ciRuns: (repo: string) => invoke<CiRun[]>("ci_runs", { repo }),
+  ciJobs: (repo: string, runId: string) => invoke<CiJob[]>("ci_jobs", { repo, runId }),
 
   conflictFile: (repo: string, file: string) => invoke<ConflictFile>("conflict_file", { repo, file }),
   conflictSave: (repo: string, file: string, content: string, stage: boolean) =>

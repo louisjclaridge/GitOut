@@ -2,7 +2,7 @@
 // browser (`npm run dev`, then open http://localhost:1420) without Rust.
 // Loaded from main.ts only when not running inside Tauri.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { Commit, Ref, Release, ReleaseInput, Settings, Status } from "../lib/api";
+import type { CiJob, CiRun, Commit, Ref, Release, ReleaseInput, Settings, Status } from "../lib/api";
 
 const REPO = "/home/dev/projects/gitout-demo";
 const now = Math.floor(Date.now() / 1000);
@@ -53,6 +53,7 @@ const refs: Ref[] = [
   { name: "refs/heads/feature/staging-ui", short: "feature/staging-ui", kind: "local", target: ui, upstream: "origin/feature/staging-ui", ahead: 0, behind: 0, current: false },
   { name: "refs/remotes/origin/main", short: "origin/main", kind: "remote", target: originMain, upstream: null, ahead: 0, behind: 0, current: false },
   { name: "refs/remotes/origin/feature/staging-ui", short: "origin/feature/staging-ui", kind: "remote", target: ui, upstream: null, ahead: 0, behind: 0, current: false },
+  { name: "refs/heads/louis/experiment-with-a-really-long-branch-name-that-keeps-going-to-test-the-sidebar-layout", short: "louis/experiment-with-a-really-long-branch-name-that-keeps-going-to-test-the-sidebar-layout", kind: "local", target: ui, upstream: null, ahead: 0, behind: 0, current: false },
   { name: "refs/tags/v0.1.0", short: "v0.1.0", kind: "tag", target: tagged, upstream: null, ahead: 0, behind: 0, current: false },
 ];
 
@@ -158,15 +159,66 @@ function saveRelease(id: string | null, input: ReleaseInput): Release {
   return r;
 }
 
+// Workflow runs: the newest one runs live from page load, so the run view has progress to show.
+const t0 = Date.now();
+const iso = (ms: number) => new Date(ms).toISOString();
+const JOBS: [string, string[]][] = [
+  ["lint", ["Set up job", "Checkout", "Install", "Lint"]],
+  ["build (ubuntu-latest)", ["Set up job", "Checkout", "Install Rust", "Cache", "Build", "Upload artifact"]],
+  ["build (windows-latest)", ["Set up job", "Checkout", "Install Rust", "Cache", "Build", "Upload artifact"]],
+  ["test", ["Set up job", "Checkout", "Install", "Unit tests", "Integration tests"]],
+];
+const STEP_MS = 3000;
+function liveJobs(): CiJob[] {
+  const elapsed = Date.now() - t0;
+  return JOBS.map(([name, steps], ji) => {
+    const start = t0 + ji * 1500;
+    const at = (i: number) => start + i * STEP_MS;
+    const doneSteps = Math.max(0, Math.min(steps.length, Math.floor((elapsed - ji * 1500) / STEP_MS)));
+    const started = elapsed >= ji * 1500;
+    const complete = doneSteps === steps.length;
+    return {
+      id: String(ji + 1),
+      name,
+      status: complete ? "completed" : started ? "running" : "queued",
+      conclusion: complete ? "success" : null,
+      startedAt: started ? iso(start) : null,
+      completedAt: complete ? iso(at(steps.length)) : null,
+      url: "https://github.com/ada/gitout/actions/runs/1",
+      steps: steps.map((s, i) => ({
+        number: i + 1,
+        name: s,
+        status: i < doneSteps ? "completed" : i === doneSteps && started ? "running" : "queued",
+        conclusion: i < doneSteps ? "success" : null,
+        startedAt: i <= doneSteps && started ? iso(at(i)) : null,
+        completedAt: i < doneSteps ? iso(at(i + 1)) : null,
+      })),
+    } as CiJob;
+  });
+}
+function runs(): CiRun[] {
+  const live = liveJobs();
+  const liveDone = live.every((j) => j.status === "completed");
+  const base = { trigger: "push", attempt: 1, actor: "ada", url: "https://github.com/ada/gitout/actions/runs/1" };
+  return [
+    { ...base, id: "1", name: "CI", title: commits[0].subject, status: liveDone ? "completed" : "running", conclusion: liveDone ? "success" : null, branch: "main", headSha: commits[0].hash, number: 42, createdAt: iso(t0), startedAt: iso(t0), updatedAt: iso(Date.now()) },
+    { ...base, id: "2", name: "Release", title: commits[1].subject, status: "completed", conclusion: "failure", branch: "main", headSha: commits[1].hash, number: 7, createdAt: iso(t0 - 3600_000), startedAt: iso(t0 - 3600_000), updatedAt: iso(t0 - 3300_000) },
+    { ...base, id: "3", name: "CI", title: commits[1].subject, status: "completed", conclusion: "success", branch: "main", headSha: commits[1].hash, number: 41, createdAt: iso(t0 - 3600_000), startedAt: iso(t0 - 3600_000), updatedAt: iso(t0 - 3400_000) },
+    { ...base, id: "4", name: "CI", title: "Staging panel", status: "completed", conclusion: "cancelled", branch: "feature/staging-ui", headSha: commits[3].hash, number: 40, trigger: "pull request", createdAt: iso(t0 - 86400_000), startedAt: iso(t0 - 86400_000), updatedAt: iso(t0 - 86000_000) },
+  ];
+}
+const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 let settings: Settings = {
   recentRepos: [REPO, "/home/dev/projects/website", "/home/dev/work/api-server"],
-  openRepos: [REPO],
+  openRepos: [REPO, "/home/dev/projects/website", "/home/dev/work/api-server"],
   activeRepo: REPO,
   accounts: [{ id: "github:github.com:ada", provider: "github", host: "github.com", username: "ada", displayName: "Ada Lovelace", avatarUrl: null, gitUser: "x-access-token" }],
   theme: "system",
   pullMode: "merge",
   autoUpdate: false,
   oauth: {},
+  lastSeenVersion: null,
 };
 
 const DIFF = `diff --git a/src/lib/graph.ts b/src/lib/graph.ts
@@ -194,7 +246,7 @@ index 1111111..2222222 100644
 export function installMock() {
   mockWindows("main");
   mockIPC(
-    (cmd, args) => {
+    async (cmd, args) => {
       const a = (args ?? {}) as Record<string, unknown>;
       switch (cmd) {
         case "settings_get":
@@ -207,7 +259,8 @@ export function installMock() {
         case "repo_open":
           return { path: a.path, name: String(a.path).split("/").pop() };
         case "status":
-          return status;
+          // The other open repos are clean and behind, so "Fetch & pull all" has something to pull.
+          return a.repo === REPO ? status : { ...status, files: [], ahead: 0, behind: String(a.repo).includes("website") ? 2 : 1 };
         case "log":
           return commits;
         case "refs":
@@ -238,8 +291,25 @@ export function installMock() {
             accountId: "github:github.com:ada",
             webUrl: "https://github.com/ada/gitout/releases",
             supportsDrafts: true,
+            supportsCi: true,
             problem: null,
           };
+        case "ci_runs":
+          return runs();
+        case "ci_jobs":
+          if (a.runId === "1") return liveJobs();
+          return JOBS.slice(0, 2).map(([name, steps], i) => ({
+            id: String(10 + i), name, status: "completed", conclusion: a.runId === "2" && i === 1 ? "failure" : "success",
+            startedAt: iso(t0 - 3600_000), completedAt: iso(t0 - 3500_000), url: null,
+            steps: steps.map((s, n) => ({ number: n + 1, name: s, status: "completed", conclusion: a.runId === "2" && i === 1 && n === 4 ? "failure" : a.runId === "2" && i === 1 && n > 4 ? "skipped" : "success", startedAt: iso(t0 - 3600_000 + n * 9000), completedAt: iso(t0 - 3600_000 + (n + 1) * 9000) })),
+          }));
+        case "fetch":
+          await pause(700);
+          return null;
+        case "pull":
+          await pause(500);
+          if (String(a.repo).includes("api-server")) throw "error: Your local changes to the following files would be overwritten by merge:\n\tsrc/server.ts";
+          return null;
         case "releases_list":
           return releases;
         case "release_create":

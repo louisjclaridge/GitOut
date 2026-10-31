@@ -95,6 +95,8 @@ If no system keychain is available (for example a bare window manager without gn
 3. Set `plugins.updater.endpoints` to `https://github.com/<owner>/GitOut/releases/latest/download/latest.json`.
 4. On GitHub, go to **Releases → Draft a new release**, create a new tag like `v0.3.0` on `main`, write the notes and click **Publish release**.
 
+   The notes are required: the app shows them in a **What's new** popup the first time it opens after updating, and the release workflow fails straight away if they're empty (add them, then re-run the failed jobs). To keep developer detail out of the popup, put the user-facing part under a `## What's new` heading; the app shows only that section when it's there.
+
    The release workflow takes the version from the tag and writes it into `package.json`, `src-tauri/Cargo.toml` and `Cargo.lock` before building (`scripts/sync-version.mjs`). You don't bump or commit anything in the repo, and the version checked into the repo is only used for dev builds. The tag must be a plain `vX.Y.Z`, because the Windows MSI bundler rejects most pre-release suffixes.
 
 The release workflow builds the AppImage, .deb and .rpm (Linux) and the MSI and NSIS installers (Windows). It uploads them to your release with the signed update bundles and `latest.json`. Until both builds finish, the latest release has no `latest.json`, so update checks find nothing. Installed apps check for updates on startup.

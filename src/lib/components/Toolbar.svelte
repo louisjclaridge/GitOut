@@ -3,12 +3,29 @@
   import { app } from "../state.svelte";
   import { showMenu } from "../menu.svelte";
   import Icon from "./Icon.svelte";
+  import RunIcon, { runState } from "./RunIcon.svelte";
 
   let { store }: { store: RepoStore } = $props();
 
   let busy = $derived(app.busy !== null);
   let st = $derived(store.status);
   let stashCount = $derived(store.stashes.length);
+
+  // CI/CD runs for the checked-out commit, summed up as one chip: running beats failed beats passed.
+  let headRuns = $derived(store.runsFor(store.headHash));
+  let checks = $derived.by(() => {
+    if (!headRuns.length) return null;
+    const tones = headRuns.map((r) => runState(r.status, r.conclusion).tone);
+    const pending = tones.filter((t) => t === "running" || t === "queued").length;
+    const failed = headRuns.find((r, i) => tones[i] === "failure");
+    const focus = headRuns.find((_, i) => tones[i] === "running") ?? failed ?? headRuns[0];
+    const label = pending
+      ? `Checks ${headRuns.length - pending}/${headRuns.length}`
+      : failed
+        ? "Checks failed"
+        : "Checks passed";
+    return { focus, label };
+  });
 </script>
 
 <div class="toolbar">
@@ -70,6 +87,17 @@
 
   <div class="spacer"></div>
 
+  {#if checks}
+    <button
+      class="k-btn ghost checks"
+      title={headRuns.map((r) => `${r.name}: ${runState(r.status, r.conclusion).label}`).join("\n")}
+      onclick={() => store.showRun(checks.focus.id)}
+    >
+      <RunIcon status={checks.focus.status} conclusion={checks.focus.conclusion} />
+      {checks.label}
+    </button>
+  {/if}
+
   <div class="group">
     <button class="k-icon-btn" aria-label="Open folder" title="Open folder" onclick={() => store.openFolder()}>
       <Icon name="folder-open" />
@@ -123,6 +151,9 @@
   }
   .spacer {
     flex: 1;
+  }
+  .checks {
+    flex: none;
   }
   .k-btn {
     padding: 0 var(--space-8);

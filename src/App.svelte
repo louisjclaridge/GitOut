@@ -13,6 +13,9 @@
     errorText,
   } from "./lib/state.svelte";
   import { checkForUpdate } from "./lib/updater";
+  import { sync, syncAll } from "./lib/sync.svelte";
+  import { showWhatsNewIfUpdated } from "./lib/whatsnew.svelte";
+  import WhatsNew from "./lib/components/WhatsNew.svelte";
   import Icon from "./lib/components/Icon.svelte";
   import Welcome from "./lib/components/Welcome.svelte";
   import RepoView from "./lib/components/RepoView.svelte";
@@ -36,6 +39,7 @@
         toast(errorText(e), "error");
       }
       await restoreTabs();
+      void showWhatsNewIfUpdated();
       if (app.settings?.autoUpdate) void checkForUpdate(false);
     })();
 
@@ -58,48 +62,62 @@
 />
 
 <div class="shell">
-  <header class="topbar">
-    <button
-      class="k-icon-btn"
-      aria-pressed={app.view === "welcome"}
-      aria-label="Home"
-      title="Home (Ctrl+T)"
-      onclick={() => (app.view = "welcome")}
-    >
-      <Icon name="home" />
-    </button>
-    {#if app.tabs.length}
-      <div class="k-tabs sessions session-tabs" role="tablist" aria-label="Open repositories">
-        {#each app.tabs as t (t.path)}
-          {@const selected = app.view === "repo" && app.active === t.path}
-          <div
-            class="k-tab"
-            title={t.path}
-            role="tab"
-            tabindex="0"
-            aria-selected={selected}
-            onclick={() => selectTab(t.path)}
-            onkeydown={(e) => e.key === "Enter" && selectTab(t.path)}
-            onauxclick={(e) => e.button === 1 && closeTab(t.path)}
-          >
+  <header class="k-titlebar topbar">
+    <div class="k-tabs sessions session-tabs" role="tablist" aria-label="Open repositories">
+      <button
+        class="k-tab home"
+        role="tab"
+        aria-selected={app.view === "welcome"}
+        aria-label="Home"
+        title="Home (Ctrl+T)"
+        onclick={() => (app.view = "welcome")}
+      >
+        <Icon name="home" size={14} />
+      </button>
+      {#each app.tabs as t (t.path)}
+        {@const selected = app.view === "repo" && app.active === t.path}
+        <div
+          class="k-tab"
+          title={t.path}
+          role="tab"
+          tabindex="0"
+          aria-selected={selected}
+          onclick={() => selectTab(t.path)}
+          onkeydown={(e) => e.key === "Enter" && selectTab(t.path)}
+          onauxclick={(e) => e.button === 1 && closeTab(t.path)}
+        >
+          {#if sync.running && (sync.items[t.path]?.step === "fetching" || sync.items[t.path]?.step === "pulling")}
+            <span class="k-spinner tab-spinner" aria-hidden="true"></span>
+          {:else}
             <Icon name="folder" size={14} />
-            <span class="ellipsis">{t.name}</span>
-            <button
-              class="close"
-              aria-label="Close {t.name}"
-              onclick={(e) => {
-                e.stopPropagation();
-                closeTab(t.path);
-              }}><Icon name="x" size={12} /></button
-            >
-          </div>
-        {/each}
-      </div>
-    {/if}
-    <button class="k-icon-btn" title="New tab (Ctrl+T)" aria-label="New tab" onclick={() => (app.view = "welcome")}>
+          {/if}
+          <span class="ellipsis">{t.name}</span>
+          <button
+            class="close"
+            aria-label="Close {t.name}"
+            onclick={(e) => {
+              e.stopPropagation();
+              closeTab(t.path);
+            }}><Icon name="x" size={12} /></button
+          >
+        </div>
+      {/each}
+    </div>
+    <button class="k-icon-btn" title="Open a repository (Ctrl+T)" aria-label="Open a repository" onclick={() => (app.view = "welcome")}>
       <Icon name="plus" />
     </button>
     <span class="spacer"></span>
+    {#if app.tabs.length}
+      <button
+        class="k-btn ghost sync"
+        disabled={sync.running || app.busy !== null}
+        title="Fetch every open repository, and pull the ones that are behind"
+        onclick={syncAll}
+      >
+        {#if sync.running}<span class="k-spinner"></span>{:else}<Icon name="sync" />{/if}
+        Fetch &amp; pull all
+      </button>
+    {/if}
     <button
       class="k-icon-btn"
       aria-pressed={app.view === "settings"}
@@ -160,6 +178,7 @@
 <Toasts />
 <Dialog />
 <ContextMenu />
+<WhatsNew />
 
 <style>
   .shell {
@@ -169,22 +188,34 @@
   }
   .topbar {
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
     height: var(--titlebar-height);
+    gap: var(--space-4);
     padding: 0 var(--space-8);
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    z-index: var(--layer-titlebar);
   }
   .session-tabs {
     min-width: 0;
     flex: 0 1 auto;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Room for the tabs' shadows inside the scroll area. */
+    padding: 4px;
   }
   .session-tabs .k-tab {
     min-width: 0;
+    flex: 0 1 auto;
     padding-right: var(--space-6);
+  }
+  .session-tabs .k-tab.home {
+    flex: none;
+    padding: 0 var(--space-12);
+  }
+  .tab-spinner {
+    width: 12px;
+    height: 12px;
+    margin: 0 1px;
+  }
+  .sync {
+    height: var(--control-sm);
   }
   .session-tabs .close {
     padding: 0;

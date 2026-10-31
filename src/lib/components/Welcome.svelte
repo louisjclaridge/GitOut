@@ -1,7 +1,8 @@
 <script lang="ts">
   import { open } from "@tauri-apps/plugin-dialog";
   import { api } from "../api";
-  import { app, addTab, openRepo, run, updateSettings } from "../state.svelte";
+  import { app, addTab, openRepo, run, selectTab, updateSettings } from "../state.svelte";
+  import { sync, syncAll } from "../sync.svelte";
   import { basename } from "../util";
   import Icon from "./Icon.svelte";
   import CloneDialog from "./CloneDialog.svelte";
@@ -24,41 +25,82 @@
   function forget(path: string) {
     void updateSettings({ recentRepos: (app.settings?.recentRepos ?? []).filter((r) => r !== path) });
   }
+
+  const STEP_ICON: Record<string, string> = { done: "success", error: "error", skipped: "skipped", waiting: "queued" };
+  const STEP_TEXT: Record<string, string> = { fetching: "Fetching…", pulling: "Pulling…", waiting: "Waiting…" };
 </script>
 
 <div class="welcome">
   <div class="inner">
     <div class="brand">
-      <img src="/logo.svg" alt="" width="48" height="48" />
+      <img src="/logo.svg" alt="" width="44" height="44" />
       <div>
-        <h1>GitOut</h1>
+        <h1 class="k-h1">GitOut</h1>
         <p>A small, fast git client.</p>
       </div>
     </div>
 
     <div class="actions">
-      <button class="card" onclick={pickAndOpen}>
-        <span class="art"><Icon name="folder-open" size={20} /></span>
-        <span class="what">
-          <strong>Open…</strong>
-          <span class="desc">A repository on this computer</span>
+      <button class="k-card row" onclick={pickAndOpen}>
+        <span class="k-tile lg"><Icon name="folder-open" size={20} /></span>
+        <span class="text">
+          <span class="title">Open…</span>
+          <span class="sub">A repository on this computer</span>
         </span>
       </button>
-      <button class="card" onclick={() => (cloning = true)}>
-        <span class="art"><Icon name="download" size={20} /></span>
-        <span class="what">
-          <strong>Clone…</strong>
-          <span class="desc">From GitHub, GitLab, Bitbucket or a URL</span>
+      <button class="k-card row" onclick={() => (cloning = true)}>
+        <span class="k-tile lg"><Icon name="download" size={20} /></span>
+        <span class="text">
+          <span class="title">Clone…</span>
+          <span class="sub">From GitHub, GitLab, Bitbucket or a URL</span>
         </span>
       </button>
-      <button class="card" onclick={pickAndInit}>
-        <span class="art"><Icon name="folder-plus" size={20} /></span>
-        <span class="what">
-          <strong>Create…</strong>
-          <span class="desc">A new, empty repository</span>
+      <button class="k-card row" onclick={pickAndInit}>
+        <span class="k-tile lg"><Icon name="folder-plus" size={20} /></span>
+        <span class="text">
+          <span class="title">Create…</span>
+          <span class="sub">A new, empty repository</span>
         </span>
       </button>
     </div>
+
+    {#if app.tabs.length}
+      <section class="k-group-section">
+        <div class="open-head">
+          <div>
+            <h2 class="k-group-header"><Icon name="folder-open" /> Open repositories</h2>
+            <p class="k-group-desc">Fetch every one, and pull those that are behind.</p>
+          </div>
+          <button class="k-btn primary" disabled={sync.running || app.busy !== null} onclick={syncAll}>
+            {#if sync.running}<span class="k-spinner"></span> Syncing…{:else}<Icon name="sync" /> Fetch &amp; pull all{/if}
+          </button>
+        </div>
+        <div class="k-group">
+          {#each app.tabs as t (t.path)}
+            {@const item = sync.items[t.path]}
+            {@const busy = item?.step === "fetching" || item?.step === "pulling"}
+            <button class="k-group-row repo-row" title={t.path} onclick={() => selectTab(t.path)}>
+              <span class="state {item?.step ?? 'idle'}">
+                {#if busy}
+                  <span class="k-spinner" role="status" aria-label={STEP_TEXT[item.step]}></span>
+                {:else}
+                  <Icon name={STEP_ICON[item?.step ?? ""] ?? "folder"} />
+                {/if}
+              </span>
+              <span class="label">
+                <span class="ellipsis">{t.name}</span>
+                {#if item && (STEP_TEXT[item.step] || item.detail)}
+                  <span class="desc" class:err={item.step === "error"}>{STEP_TEXT[item.step] ?? item.detail}</span>
+                {:else}
+                  <span class="desc mono ellipsis">{t.path}</span>
+                {/if}
+              </span>
+              <Icon name="chevron" size={14} />
+            </button>
+          {/each}
+        </div>
+      </section>
+    {/if}
 
     <div class="columns">
       <section class="k-group-section">
@@ -66,7 +108,7 @@
         <div class="k-group">
           {#each app.settings?.recentRepos ?? [] as r (r)}
             <div class="recent">
-              <button class="row" onclick={() => openRepo(r)} title={r}>
+              <button class="recent-row" onclick={() => openRepo(r)} title={r}>
                 <span class="name">{basename(r)}</span>
                 <span class="path mono ellipsis">{r}</span>
               </button>
@@ -120,78 +162,81 @@
     width: min(860px, 100%);
     display: flex;
     flex-direction: column;
-    gap: var(--space-32);
+    gap: var(--space-24);
   }
   .brand {
     display: flex;
     align-items: center;
     gap: var(--space-16);
   }
-  h1 {
-    font-size: 28px;
-    line-height: 34px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
   .brand p {
-    color: var(--text-2);
+    color: var(--text-3);
   }
   .actions {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: var(--space-12);
   }
-  .card {
+  .open-head {
     display: flex;
     align-items: center;
     gap: var(--space-12);
-    padding: var(--space-16);
-    text-align: left;
-    color: var(--text);
-    background: var(--surface);
-    border: 0;
-    border-radius: var(--radius-md);
-    transition: background-color 120ms ease;
+    margin-bottom: var(--space-8);
   }
-  :global([data-theme="dark"]) .card {
-    box-shadow: 0 0 0 1px var(--border);
-  }
-  .card:hover {
-    background: var(--surface-hover);
-  }
-  .card:active {
-    opacity: 0.8;
-  }
-  .art {
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    flex: none;
-    border-radius: var(--radius-md);
-    background: var(--surface-2);
-    color: var(--accent-text);
-  }
-  .card:hover .art {
-    background: var(--surface);
-  }
-  .what {
-    display: flex;
-    flex-direction: column;
+  .open-head > div {
+    flex: 1;
     min-width: 0;
   }
-  .what strong {
-    font-weight: 600;
+  .repo-row {
+    width: 100%;
+    border: 0;
+    background: none;
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
   }
-  .desc {
-    font-size: 12px;
-    line-height: 16px;
+  .repo-row + .repo-row {
+    border-top: 1px solid var(--border);
+  }
+  .repo-row:hover .label > .ellipsis {
+    color: var(--accent-text);
+  }
+  .repo-row > :global(.k-icon) {
     color: var(--text-3);
+  }
+  .state {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: none;
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    color: var(--text-3);
+  }
+  .state.done {
+    background: var(--success-soft);
+    color: var(--success-text);
+  }
+  .state.error {
+    background: var(--danger-soft);
+    color: var(--danger-text);
+  }
+  .state.fetching,
+  .state.pulling {
+    background: var(--accent-soft);
+  }
+  .desc.err {
+    color: var(--danger-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
   }
   .columns {
     display: grid;
     grid-template-columns: 2fr 1fr;
-    gap: var(--space-24);
+    gap: var(--space-16);
     align-items: start;
   }
   @media (max-width: 760px) {
@@ -202,35 +247,30 @@
   .k-group-section + .k-group-section {
     margin-top: 0;
   }
-  .k-group {
-    overflow: hidden;
-  }
   .recent {
     display: flex;
     align-items: center;
-    padding-right: var(--space-8);
-  }
-  .recent + .recent {
-    border-top: 1px solid var(--border);
+    margin: 0 calc(-1 * var(--space-8));
+    border-radius: var(--radius-sm);
   }
   .recent:hover {
     background: var(--surface-hover);
   }
-  .row {
+  .recent-row {
     flex: 1;
     display: flex;
     align-items: baseline;
     gap: var(--space-12);
     min-width: 0;
-    min-height: 44px;
-    padding: var(--space-12) var(--space-16);
+    min-height: 40px;
+    padding: var(--space-8);
     border: 0;
     background: none;
     color: var(--text);
     text-align: left;
   }
   .name {
-    font-weight: 500;
+    font-weight: 600;
     flex-shrink: 0;
   }
   .path {

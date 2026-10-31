@@ -1,6 +1,6 @@
 // State and actions for one open repository.
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
-import { api, type Commit, type DiffMode, type Ref, type Release, type ReleaseHost, type Stash, type Status } from "./api";
+import { api, type Commit, type DiffMode, type Ref, type Release, type ReleaseHost, type Stash, type Status, type CiRun } from "./api";
 import { layoutGraph } from "./graph";
 import { app, ask, confirm, errorText, prompt, run, runOk, toast } from "./state.svelte";
 import type { MenuItem } from "./menu.svelte";
@@ -21,6 +21,7 @@ export type CenterView =
   | { kind: "diff"; target: DiffTarget }
   | { kind: "merge"; file: string }
   | { kind: "release"; id: string }
+  | { kind: "run"; id: string }
   /** `id` null creates a new release, optionally from `tag` or at `target`. */
   | { kind: "release-edit"; id: string | null; tag?: string; target?: string };
 
@@ -117,14 +118,16 @@ export class RepoStore {
     await run(() => api.fetch(this.path), { label: "Fetching", done: "Fetched from all remotes" });
     // Fetch is the "catch up with the server" action, so refresh releases too once they've been looked at.
     if (this.releasesStatus !== "idle") void this.loadReleases();
+    if (this.runsStatus !== "idle") void this.loadRuns();
   }
   pull() {
     return run(() => api.pull(this.path), { label: "Pulling", done: "Pulled" });
   }
   async push(force = false) {
     if (force && !(await confirm("Force push?", "This overwrites the remote branch with your local history (using --force-with-lease, so it fails safely if someone else pushed in the meantime).", "Force push", true))) return;
-    const r = await run(() => api.push(this.path, force), { label: "Pushing", done: "Pushed" });
-    return r;
+    const ok = await runOk(() => api.push(this.path, force), { label: "Pushing", done: "Pushed" });
+    // A push usually starts CI runs; the host takes a moment to queue them.
+    if (ok && this.hasCi) setTimeout(() => void this.loadRuns(), 4000);
   }
 
   // ------------------------------------------------------------ branches
@@ -334,11 +337,17 @@ export class RepoStore {
   releasesStatus = $state<"idle" | "loading" | "loaded" | "error">("idle");
   releasesError = $state("");
 
+  /** Where the repository is hosted. Cached; it only changes if the remote or accounts do. */
+  async loadHost(): Promise<ReleaseHost> {
+    if (!this.releaseHost) this.releaseHost = await api.releaseHost(this.path);
+    return this.releaseHost;
+  }
+
   async loadReleases() {
     this.releasesStatus = "loading";
     try {
-      const host = await api.releaseHost(this.path);
-      this.releaseHost = host;
+      this.releaseHost = null;
+      const host = await this.loadHost();
       this.releases = host.problem ? [] : await api.releasesList(this.path);
       this.releasesStatus = "loaded";
     } catch (e) {
@@ -402,6 +411,52 @@ export class RepoStore {
       { label: "Copy link", icon: "copy", action: () => url && copy(url, "Link copied"), disabled: !url },
       "sep",
       { label: "Delete release…", icon: "x", danger: true, action: () => this.deleteRelease(r) },
+    ];
+  }
+
+  // ------------------------------------------------------------ ci/cd
+
+  runs = $state<CiRun[]>([]);
+  /** CI/CD runs come from the hosting API: loaded when the repo opens, then polled by RepoView. */
+  runsStatus = $state<"idle" | "loading" | "loaded" | "error">("idle");
+  runsError = $state("");
+
+  /** Whether GitOut can show CI/CD runs for this repository's host. Null until the host is known. */
+  get hasCi(): boolean | null {
+    return this.releaseHost ? this.releaseHost.supportsCi : null;
+  }
+
+  /** Whether any run is still queued or going, so it's worth polling sooner. */
+  runsActive = $derived(this.runs.some((r) => r.status !== "completed"));
+
+  async loadRuns() {
+    if (this.runsStatus === "idle" || this.runsStatus === "error") this.runsStatus = "loading";
+    try {
+      const host = await this.loadHost();
+      this.runs = host.supportsCi && !host.problem ? await api.ciRuns(this.path) : [];
+      this.runsStatus = "loaded";
+    } catch (e) {
+      this.runsError = errorText(e);
+      this.runsStatus = "error";
+    }
+  }
+
+  /** Runs for one commit, newest first. */
+  runsFor(sha: string | null): CiRun[] {
+    return sha ? this.runs.filter((r) => r.headSha === sha) : [];
+  }
+
+  showRun(id: string) {
+    this.center = { kind: "run", id };
+  }
+
+  runMenu(r: CiRun): MenuItem[] {
+    const url = r.url;
+    const commit = this.commits.some((c) => c.hash === r.headSha);
+    return [
+      { label: "Show commit", icon: "commit", action: () => this.selectCommit(r.headSha), disabled: !commit },
+      { label: "Open in browser", icon: "external", action: () => url && run(() => openUrl(url)), disabled: !url },
+      { label: "Copy link", icon: "copy", action: () => url && copy(url, "Link copied"), disabled: !url },
     ];
   }
 

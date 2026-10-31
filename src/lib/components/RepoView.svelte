@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api } from "../api";
-  import { app, confirm, run, runOk } from "../state.svelte";
+  import { app, confirm, DETAILS_WIDTH, layout, run, runOk, saveLayout, SIDEBAR_WIDTH } from "../state.svelte";
   import { RepoStore } from "../repo.svelte";
   import Toolbar from "./Toolbar.svelte";
   import Sidebar from "./Sidebar.svelte";
@@ -12,6 +12,8 @@
   import MergeView from "./MergeView.svelte";
   import ReleaseView from "./ReleaseView.svelte";
   import ReleaseEditor from "./ReleaseEditor.svelte";
+  import RunView from "./RunView.svelte";
+  import Splitter from "./Splitter.svelte";
   import Icon from "./Icon.svelte";
 
   let { repo }: { repo: string } = $props();
@@ -31,11 +33,41 @@
     let timer: ReturnType<typeof setTimeout>;
     const onFocus = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => store.load(), 150);
+      timer = setTimeout(() => {
+        void store.load();
+        if (store.hasCi) void store.loadRuns();
+      }, 150);
     };
     window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
+
+    // CI/CD runs: load once, then poll — quickly while something is running.
+    // The run view polls its own run faster.
+    void store.loadRuns();
+    let poll: ReturnType<typeof setTimeout>;
+    const again = () => {
+      poll = setTimeout(async () => {
+        if (store.hasCi && document.visibilityState === "visible" && store.center.kind !== "run") await store.loadRuns();
+        again();
+      }, store.runsActive ? 10_000 : 60_000);
+    };
+    again();
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearTimeout(timer);
+      clearTimeout(poll);
+    };
   });
+
+  $effect(() => {
+    void layout.sidebar;
+    void layout.details;
+    saveLayout();
+  });
+
+  // Keep at least this much for the history between the two side columns.
+  const CENTER_MIN = 360;
+  let columnsWidth = $state(0);
 
   const STATE_LABEL: Record<string, string> = {
     merging: "A merge is in progress",
@@ -58,7 +90,7 @@
   function onKey(e: KeyboardEvent) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     // The merge editor and release editor hold unsaved work, so Escape doesn't close them.
-    if (e.key === "Escape" && (center.kind === "diff" || center.kind === "release")) store.center = { kind: "graph" };
+    if (e.key === "Escape" && (center.kind === "diff" || center.kind === "release" || center.kind === "run")) store.center = { kind: "graph" };
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "r") {
       e.preventDefault();
       void store.load();
@@ -103,14 +135,31 @@
     </div>
   {/if}
 
-  <div class="columns" class:merging>
+  <div
+    class="columns"
+    class:merging
+    bind:clientWidth={columnsWidth}
+    style="--sidebar-w:{layout.sidebar}px; --details-w:{layout.details}px"
+  >
     <!-- Hidden rather than removed while merging, so it keeps its state. -->
-    <div class="side" class:hidden={merging}><Sidebar {store} /></div>
+    <div class="side" class:hidden={merging}>
+      <Sidebar {store} />
+      <Splitter
+        bind:width={layout.sidebar}
+        min={180}
+        max={Math.min(560, columnsWidth - layout.details - CENTER_MIN)}
+        initial={SIDEBAR_WIDTH}
+        side="right"
+        label="Resize sidebar"
+      />
+    </div>
     <div class="center">
       {#if center.kind === "merge"}
         {#key center.file}<MergeView {store} file={center.file} />{/key}
       {:else if center.kind === "release"}
         <ReleaseView {store} id={center.id} />
+      {:else if center.kind === "run"}
+        {#key center.id}<RunView {store} id={center.id} />{/key}
       {:else if center.kind === "release-edit"}
         {#key center}<ReleaseEditor {store} id={center.id} tag={center.tag} target={center.target} />{/key}
       {:else if center.kind === "diff"}
@@ -120,6 +169,14 @@
       {/if}
     </div>
     <aside class="details">
+      <Splitter
+        bind:width={layout.details}
+        min={260}
+        max={Math.min(720, columnsWidth - (merging ? 0 : layout.sidebar) - CENTER_MIN)}
+        initial={DETAILS_WIDTH}
+        side="left"
+        label="Resize details panel"
+      />
       {#if store.selected?.kind === "wip"}
         <WipPanel {store} />
       {:else if store.selected?.kind === "commit"}
@@ -154,11 +211,16 @@
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-columns: 232px minmax(0, 1fr) 340px;
+    /* min() keeps the history visible if the window shrinks below the saved widths. */
+    grid-template-columns: min(var(--sidebar-w), 30%) minmax(0, 1fr) min(var(--details-w), 40%);
   }
   .side {
+    position: relative;
     display: grid;
+    /* minmax(0, …) so a long branch name can't widen the column past its set width. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
+    min-width: 0;
     min-height: 0;
   }
   .side.hidden {
@@ -166,7 +228,7 @@
   }
   /* The merge editor needs the width for its three panes. */
   .columns.merging {
-    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-columns: minmax(0, 1fr) min(var(--details-w), 40%);
   }
   .center {
     min-width: 0;
@@ -176,18 +238,12 @@
     background: var(--surface);
   }
   .details {
+    position: relative;
+    min-width: 0;
     min-height: 0;
     border-left: 1px solid var(--border);
     background: var(--surface);
     display: flex;
     flex-direction: column;
-  }
-  @media (max-width: 1100px) {
-    .columns {
-      grid-template-columns: 200px minmax(0, 1fr) 300px;
-    }
-    .columns.merging {
-      grid-template-columns: minmax(0, 1fr) 260px;
-    }
   }
 </style>
