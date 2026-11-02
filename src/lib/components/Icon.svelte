@@ -13,6 +13,9 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import CircleCheck from "@lucide/svelte/icons/circle-check";
+  import CircleDashed from "@lucide/svelte/icons/circle-dashed";
+  import CircleMinus from "@lucide/svelte/icons/circle-minus";
+  import CircleSlash from "@lucide/svelte/icons/circle-slash";
   import CircleX from "@lucide/svelte/icons/circle-x";
   import CloudDownload from "@lucide/svelte/icons/cloud-download";
   import Cloud from "@lucide/svelte/icons/cloud";
@@ -29,11 +32,13 @@
   import GitMerge from "@lucide/svelte/icons/git-merge";
   import House from "@lucide/svelte/icons/house";
   import Info from "@lucide/svelte/icons/info";
+  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Minus from "@lucide/svelte/icons/minus";
   import Package from "@lucide/svelte/icons/package";
   import Palette from "@lucide/svelte/icons/palette";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Search from "@lucide/svelte/icons/search";
   import Settings from "@lucide/svelte/icons/settings";
@@ -88,6 +93,11 @@
     download: Download,
     palette: Palette,
     sliders: SlidersHorizontal,
+    sync: RefreshCw,
+    running: LoaderCircle,
+    queued: CircleDashed,
+    cancelled: CircleSlash,
+    skipped: CircleMinus,
   };
 
   let { name, size = 16, stroke = 1.75 }: { name: string; size?: number; stroke?: number } = $props();

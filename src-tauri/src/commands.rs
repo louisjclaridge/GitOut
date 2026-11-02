@@ -1,6 +1,7 @@
 //! Tauri commands exposed to the frontend. Every git invocation runs on a
 //! blocking thread so the UI never stalls on a slow repository.
 
+use crate::ci::{self, Ci};
 use crate::auth::{self, DeviceStart, RemoteRepo, TokenStore};
 use crate::error::{Error, Result};
 use crate::git::{self, ChangedFile, Commit, Opts, Ref, Stash, Status};
@@ -80,6 +81,7 @@ pub struct SettingsPatch {
     /// Empty string clears it.
     active_repo: Option<String>,
     recent_repos: Option<Vec<String>>,
+    last_seen_version: Option<String>,
 }
 
 #[tauri::command]
@@ -92,6 +94,7 @@ pub fn settings_update(state: State<AppState>, patch: SettingsPatch) -> Result<S
         if let Some(v) = patch.open_repos { s.open_repos = v }
         if let Some(v) = patch.active_repo { s.active_repo = (!v.is_empty()).then_some(v) }
         if let Some(v) = patch.recent_repos { s.recent_repos = v }
+        if let Some(v) = patch.last_seen_version { s.last_seen_version = Some(v) }
     })
 }
 
@@ -689,7 +692,8 @@ async fn resolve_release_host(state: &AppState, repo: String) -> Result<ReleaseH
     Ok(releases::resolve_host(&remote.name, &remote.url, &state.store.get().accounts))
 }
 
-async fn releases_api(state: &AppState, repo: String) -> Result<Releases> {
+/// The hosting API details for `repo` and a token for the account that can use them.
+async fn hosted_api(state: &AppState, repo: String) -> Result<(ReleaseHost, String)> {
     let host = resolve_release_host(state, repo).await?;
     if let Some(problem) = &host.problem {
         return Err(Error::Other(problem.clone()));
@@ -702,6 +706,11 @@ async fn releases_api(state: &AppState, repo: String) -> Result<Releases> {
         .find(|a| host.account_id.as_deref() == Some(a.id.as_str()))
         .ok_or_else(|| Error::Auth("Unknown account".into()))?;
     let token = auth::access_token(&state.tokens, &account).await?;
+    Ok((host, token))
+}
+
+async fn releases_api(state: &AppState, repo: String) -> Result<Releases> {
+    let (host, token) = hosted_api(state, repo).await?;
     Releases::new(&host, token)
 }
 
@@ -759,6 +768,23 @@ pub async fn release_changelog(repo: String, target: String) -> Result<Changelog
         Ok(Changelog { previous, lines: out.lines().map(String::from).collect() })
     })
     .await
+}
+
+// ---------------------------------------------------------------- ci/cd
+
+async fn ci_api(state: &AppState, repo: String) -> Result<Ci> {
+    let (host, token) = hosted_api(state, repo).await?;
+    Ci::new(&host, token)
+}
+
+#[tauri::command]
+pub async fn ci_runs(state: State<'_, AppState>, repo: String) -> Result<Vec<ci::Run>> {
+    ci_api(&state, repo).await?.runs().await
+}
+
+#[tauri::command]
+pub async fn ci_jobs(state: State<'_, AppState>, repo: String, run_id: String) -> Result<Vec<ci::Job>> {
+    ci_api(&state, repo).await?.jobs(&run_id).await
 }
 
 // ---------------------------------------------------------------- conflicts

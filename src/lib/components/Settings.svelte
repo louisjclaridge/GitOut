@@ -4,6 +4,7 @@
   import { api, type Account, type Provider } from "../api";
   import { app, confirm, run, updateSettings } from "../state.svelte";
   import { checkForUpdate } from "../updater";
+  import { showWhatsNew } from "../whatsnew.svelte";
   import Icon from "./Icon.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
   import SignIn from "./SignIn.svelte";
@@ -39,7 +40,7 @@
 
 <div class="settings">
   <div class="inner">
-    <h1>Settings</h1>
+    <h1 class="k-h1">Settings</h1>
 
     <section class="k-group-section">
       <h2 class="k-group-header"><Icon name="user" /> Accounts</h2>
@@ -130,6 +131,7 @@
             <span>GitOut {version}</span>
             <span class="desc">{app.gitVersion ?? "git not found"}</span>
           </span>
+          <button class="k-btn ghost" onclick={showWhatsNew}>What's new</button>
           <button
             class="k-btn"
             disabled={checking}
@@ -190,11 +192,6 @@
     flex-direction: column;
   }
   h1 {
-    font-family: var(--font-display);
-    font-size: 22px;
-    line-height: 28px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
     margin-bottom: var(--space-24);
   }
   .avatar {

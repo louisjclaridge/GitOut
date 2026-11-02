@@ -74,6 +74,14 @@ export function isoToUnix(iso: string | null | undefined): number | null {
   return Number.isNaN(ms) ? null : Math.floor(ms / 1000);
 }
 
+/** A duration in seconds as "45s", "3m 12s" or "1h 4m". */
+export function formatDuration(secs: number): string {
+  const s = Math.max(0, Math.round(secs));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+  return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+}
+
 const SEMVER_RE = /^(v?)(\d+)\.(\d+)\.(\d+)$/;
 
 /** The next patch, minor and major versions after the highest x.y.z tag, keeping its "v" prefix. */

@@ -43,6 +43,8 @@ pub struct Settings {
     pub pull_mode: String,
     pub auto_update: bool,
     pub oauth: OAuthOverrides,
+    /// The app version whose "What's new" notes were last shown, so they appear once after each update.
+    pub last_seen_version: Option<String>,
 }
 
 impl Default for Settings {
@@ -56,6 +58,7 @@ impl Default for Settings {
             pull_mode: "merge".into(),
             auto_update: true,
             oauth: OAuthOverrides::default(),
+            last_seen_version: None,
         }
     }
 }

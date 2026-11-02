@@ -2,11 +2,13 @@
   import type { Ref, Release } from "../api";
   import type { RepoStore } from "../repo.svelte";
   import { showMenu } from "../menu.svelte";
+  import { relativeTime, isoToUnix } from "../util";
   import Icon from "./Icon.svelte";
+  import RunIcon, { runState } from "./RunIcon.svelte";
 
   let { store }: { store: RepoStore } = $props();
 
-  let open = $state<Record<string, boolean>>({ local: true, remote: true, tags: false, releases: false, stashes: true });
+  let open = $state<Record<string, boolean>>({ local: true, remote: true, tags: false, releases: false, stashes: true, ci: true });
   let filter = $state("");
 
   const match = (r: Ref) => !filter || r.short.toLowerCase().includes(filter.toLowerCase());
@@ -18,6 +20,12 @@
     store.releases.filter((r: Release) => !filter || `${r.name} ${r.tag}`.toLowerCase().includes(filter.toLowerCase())),
   );
   let shownRelease = $derived(store.center.kind === "release" ? store.center.id : null);
+  let shownRun = $derived(store.center.kind === "run" ? store.center.id : null);
+  let runs = $derived(
+    store.runs
+      .filter((r) => !filter || `${r.title} ${r.name} ${r.branch ?? ""}`.toLowerCase().includes(filter.toLowerCase()))
+      .slice(0, 15),
+  );
   let remotes = $derived.by(() => {
     const groups = new Map<string, Ref[]>();
     for (const r of store.refs) {
@@ -33,6 +41,7 @@
   function toggle(k: string) {
     open[k] = !open[k];
     if (k === "releases" && open[k] && store.releasesStatus === "idle") void store.loadReleases();
+    if (k === "ci" && open[k] && store.runsStatus !== "loading") void store.loadRuns();
   }
 </script>
 
@@ -129,6 +138,38 @@
       </div>
     {/if}
 
+    {#if store.hasCi !== false}
+      {@render header("ci", "CI/CD", null)}
+      {#if open.ci}
+        <div class="k-list">
+          {#if store.runsStatus === "loading" && !store.runs.length}
+            <div class="none"><span class="k-spinner" role="status" aria-label="Loading CI/CD runs"></span></div>
+          {:else if store.runsStatus === "error"}
+            <div class="none selectable">{store.runsError}</div>
+            <button class="k-item" onclick={() => store.loadRuns()}><Icon name="refresh" size={14} /><span class="name">Try again</span></button>
+          {:else if store.releaseHost?.problem}
+            <div class="none">{store.releaseHost.problem.replace("manage its releases", "see its CI/CD runs")}</div>
+          {:else}
+            {#each runs as r (r.id)}
+              {@const created = isoToUnix(r.createdAt)}
+              <button
+                class="k-item run"
+                aria-current={shownRun === r.id ? "true" : undefined}
+                title="{r.name} #{r.number} · {runState(r.status, r.conclusion).label}{r.branch ? ` · ${r.branch}` : ''}"
+                onclick={() => store.showRun(r.id)}
+                oncontextmenu={(e) => showMenu(e, store.runMenu(r))}
+              >
+                <RunIcon status={r.status} conclusion={r.conclusion} size={14} />
+                <span class="name">{r.title || r.name}</span>
+                {#if created}<span class="meta">{relativeTime(created).replace(" ago", "")}</span>{/if}
+              </button>
+            {/each}
+            {#if !store.runs.length && store.runsStatus === "loaded"}<div class="none">No CI/CD runs</div>{/if}
+          {/if}
+        </div>
+      {/if}
+    {/if}
+
     {@render header("stashes", "Stashes", store.stashes.length)}
     {#if open.stashes}
       <div class="k-list">
@@ -153,12 +194,16 @@
   .sidebar {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     min-height: 0;
     background: var(--bg);
     border-right: 1px solid var(--border);
   }
   .filter {
     margin: var(--space-8);
+  }
+  .filter .k-input {
+    min-width: 0;
   }
   .scroll {
     flex: 1;
